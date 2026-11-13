@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JOMT · Just One More Texture</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='2' width='20' height='20' rx='5' fill='%235fe3b0'/%3E%3Cpath d='M7 7h4v4H7zM13 13h4v4h-4z' fill='%2306150f'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="empty">
+  <header class="topbar">
+    <div class="brand" title="Just One More Texture">
+      <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5" fill="currentColor"/><path d="M7 7h4v4H7zM13 13h4v4h-4z" fill="#06150f"/></svg>
+      <span>JOMT</span>
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <button class="add-tab" id="addTab" type="button" title="New texture (N)" data-i18n-title aria-label="New texture" data-i18n-aria><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+    <div class="lang-bar" id="langBar" role="group" aria-label="Language" data-i18n-aria></div>
+  </header>
+
+  <main class="layout">
+    <section class="welcome" id="welcome">
+      <div class="welcome-inner">
+        <h1 class="hero" aria-label="Just One More Texture"><span aria-hidden="true">Just One More<br><span class="hero-word" id="heroWord">Texture</span></span></h1>
+        <p class="tagline" data-i18n>A comprehensive Texture Generator with a lot of control for developers, designers, artists and other creative individuals</p>
+        <p data-i18n>Pick a generator to open it in a new tab. Every tab keeps its own settings and you can export at 256 px up to 8K.</p>
+        <div class="tag-bar" data-grid="welcomeGrid"></div>
+        <div class="gen-grid" id="welcomeGrid"></div>
+        <p class="hint" data-i18n-html>Shortcuts: <kbd>N</kbd> new tab · <kbd>T</kbd> tiling preview · <kbd>R</kbd> new seed · <kbd>M</kbd> normal map / tilesheet · <kbd>F</kbd> fit · <kbd>Ctrl</kbd>+<kbd>S</kbd> export · <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> undo / redo</p>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="toolbar">
+        <div class="tb-group">
+          <span class="tb-label" data-i18n>Aspect</span>
+          <select id="aspect"></select>
+          <div class="asp-custom" id="aspCustom" hidden>
+            <input class="num" id="aspW" type="number" min="0.01" max="100" step="any" title="Width ratio" data-i18n-title aria-label="Width ratio" data-i18n-aria>
+            <span class="asp-colon">:</span>
+            <input class="num" id="aspH" type="number" min="0.01" max="100" step="any" title="Height ratio" data-i18n-title aria-label="Height ratio" data-i18n-aria>
+            <button class="tb-btn" id="aspSwap" type="button" title="Swap width and height" data-i18n-title>⇄</button>
+          </div>
+        </div>
+        <div class="tb-group">
+          <span class="tb-label" data-i18n>Preview</span>
+          <select id="previewRes">
+            <option value="256">256 px</option>
+            <option value="512">512 px</option>
+            <option value="1024">1024 px</option>
+            <option value="export" data-i18n>Export size (pixel view)</option>
+          </select>
+        </div>
+        <div class="tb-sep"></div>
+        <div class="tb-group">
+          <button class="tb-btn" id="zoomOut" type="button" title="Zoom out" data-i18n-title>−</button>
+          <span class="zoom-label" id="zoomLabel">100%</span>
+          <button class="tb-btn" id="zoomIn" type="button" title="Zoom in" data-i18n-title>+</button>
+          <button class="tb-btn text" id="zoomFit" type="button" title="Fit to view (F)" data-i18n-title data-i18n>Fit</button>
+          <button class="tb-btn text" id="zoom100" type="button" title="Actual preview pixels (1)" data-i18n-title>1:1</button>
+        </div>
+        <div class="tb-sep"></div>
+        <button class="tb-btn text" id="tileBtn" type="button" title="Tiling preview: shows the texture repeated 3×3 (T)" data-i18n-title>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3.5" y="3.5" width="17" height="17" rx="1"/><path d="M9.2 3.5v17M14.8 3.5v17M3.5 9.2h17M3.5 14.8h17"/></svg>
+          <span data-i18n>Tiling Preview</span>
+        </button>
+        <div class="tb-group bg-seg" id="bgSeg" title="Preview background" data-i18n-title>
+          <button type="button" data-bg="checker" title="Checkerboard" data-i18n-title><i class="sw sw-checker"></i></button>
+          <button type="button" data-bg="black" title="Black" data-i18n-title><i class="sw" style="background:#000"></i></button>
+          <button type="button" data-bg="gray" title="Gray" data-i18n-title><i class="sw" style="background:#6e7170"></i></button>
+          <button type="button" data-bg="white" title="White" data-i18n-title><i class="sw" style="background:#fff"></i></button>
+        </div>
+      </div>
+      <div class="viewport" id="viewport">
+        <canvas id="view"></canvas>
+      </div>
+      <div class="anim-box" id="animBox" hidden title="Animation preview of the tilesheet" data-i18n-title>
+        <canvas id="animView"></canvas>
+        <span id="animLabel"></span>
+      </div>
+      <div class="statusbar">
+        <span id="statusInfo"></span>
+        <span class="status-hint" data-i18n>Wheel to zoom · drag to pan</span>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <div class="panel-head">
+        <div class="panel-titles">
+          <div class="panel-title" id="genName"></div>
+          <div class="panel-sub" id="genDesc"></div>
+        </div>
+        <div class="panel-actions">
+          <button class="icon-btn" id="undoBtn" type="button" title="Undo (Ctrl+Z)" data-i18n-title disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
+          </button>
+          <button class="icon-btn" id="redoBtn" type="button" title="Redo (Ctrl+Y / Ctrl+Shift+Z)" data-i18n-title disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg>
+          </button>
+          <button class="icon-btn" id="randBtn" type="button" title="New random seed (R)" data-i18n-title>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="15" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/><circle cx="9" cy="15" r="1" fill="currentColor"/></svg>
+          </button>
+          <button class="icon-btn" id="dupBtn" type="button" title="Duplicate tab" data-i18n-title>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+          </button>
+          <button class="icon-btn" id="resetBtn" type="button" title="Reset to defaults" data-i18n-title>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="mode-bar" id="modeBar" hidden>
+        <div class="seg" id="modeSeg"></div>
+      </div>
+      <div class="preset-bar" id="presetBar">
+        <button class="icon-btn small" id="presetPrev" type="button" title="Previous preset" data-i18n-title>‹</button>
+        <select id="presetSel" title="Presets: load a complete look, then tweak it" data-i18n-title></select>
+        <button class="icon-btn small" id="presetNext" type="button" title="Next preset" data-i18n-title>›</button>
+      </div>
+      <div class="controls" id="controls"></div>
+      <div class="export">
+        <div class="export-head">
+          <span data-i18n>Export size</span>
+          <span class="export-dims" id="exportDims"></span>
+        </div>
+        <div class="seg" id="sizeSeg"></div>
+        <div class="ctl" id="hardRow" title="Supersample, then give every pixel one solid color and hard alpha: crisp pixel-art edges" data-i18n-title>
+          <label class="ctl-label" for="hardPixels" data-i18n>Hard pixels (pixel art)</label>
+          <label class="switch"><input type="checkbox" id="hardPixels"><span class="knob"></span></label>
+        </div>
+        <div class="export-row">
+          <select id="format">
+            <option value="png">PNG</option>
+            <option value="webp">WebP</option>
+            <option value="jpeg">JPG</option>
+          </select>
+          <button class="btn primary grow" id="exportBtn" type="button" title="Ctrl+S">Download PNG</button>
+          <button class="btn" id="copyBtn" type="button" title="Copy as PNG to clipboard" data-i18n-title data-i18n>Copy</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <div class="modal" id="picker" hidden>
+    <div class="modal-card" role="dialog" aria-label="New texture" data-i18n-aria>
+      <div class="modal-head">
+        <h2 data-i18n>New texture</h2>
+        <button class="icon-btn" id="pickerClose" type="button" title="Close (Esc)" data-i18n-title>×</button>
+      </div>
+      <div class="tag-bar" data-grid="pickerGrid"></div>
+      <div class="gen-grid" id="pickerGrid"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="closeDialog" hidden>
+    <div class="modal-card dialog" role="alertdialog" aria-labelledby="closeTitle" aria-describedby="closeText">
+      <h2 id="closeTitle" data-i18n>Close without exporting?</h2>
+      <p id="closeText"></p>
+      <div class="dialog-actions">
+        <button class="btn ghost" id="closeCancel" type="button" data-i18n>Cancel</button>
+        <button class="btn danger" id="closeDiscard" type="button" data-i18n>Close without exporting</button>
+        <button class="btn primary" id="closeExport" type="button" data-i18n>Export &amp; close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="busy" id="busy" hidden><div class="spinner"></div><span id="busyText"></span></div>
+  <div class="toast" id="toast"></div>
+
+  <script src="js/core.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/i18n/de.js"></script>
+  <script src="js/i18n/fr.js"></script>
+  <script src="js/i18n/es.js"></script>
+  <script src="js/i18n/it.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/normal.js"></script>
+  <script src="js/sheet.js"></script>
+  <!-- generators, in grid order: grouped roughly by output type -->
+  <!-- surfaces & materials -->
+  <script src="js/gen/pattern.js"></script>
+  <script src="js/gen/noise.js"></script>
+  <script src="js/gen/bricks.js"></script>
+  <script src="js/gen/material.js"></script>
+  <script src="js/gen/camo.js"></script>
+  <script src="js/gen/grass.js"></script>
+  <script src="js/gen/flowfield.js"></script>
+  <!-- masks & maps -->
+  <script src="js/gen/alien.js"></script>
+  <script src="js/gen/grime.js"></script>
+  <script src="js/gen/scratches.js"></script>
+  <script src="js/gen/debris.js"></script>
+  <script src="js/gen/gradient.js"></script>
+  <!-- decals -->
+  <script src="js/gen/splatter.js"></script>
+  <script src="js/gen/graffiti.js"></script>
+  <script src="js/gen/impact.js"></script>
+  <script src="js/gen/insect.js"></script>
+  <!-- foliage cards -->
+  <script src="js/gen/grass-billboard.js"></script>
+  <!-- vfx -->
+  <script src="js/gen/particle.js"></script>
+  <script src="js/gen/muzzle-front.js"></script>
+  <script src="js/gen/muzzle-side.js"></script>
+  <script src="js/gen/lightning.js"></script>
+  <script src="js/gen/rotor.js"></script>
+  <!-- lighting -->
+  <script src="js/gen/cookie.js"></script>
+  <script src="js/gen/light-cone.js"></script>
+  <script src="js/gen/vignette.js"></script>
+  <!-- ui -->
+  <script src="js/gen/button.js"></script>
+  <script src="js/gen/border.js"></script>
+  <script src="js/gen/shape.js"></script>
+  <script src="js/gen/mask.js"></script>
+  <script src="js/gen/cursor.js"></script>
+  <script src="js/gen/health-bar.js"></script>
+  <script src="js/gen/symbol.js"></script>
+  <!-- aim & hud -->
+  <script src="js/gen/crosshair.js"></script>
+  <script src="js/gen/red-dot.js"></script>
+  <script src="js/gen/scope.js"></script>
+  <script src="js/gen/tank-reticle.js"></script>
+  <script src="js/gen/visor.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
