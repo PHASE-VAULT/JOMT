@@ -8,54 +8,75 @@
   const CENTERED = ['ring', 'cross'];
 
   /* Shape definitions, tip (hotspot) at 0,0, y down, extent ~1.
-     pts: outline polygon. ext: interior ridge points [x, y, height] (outline points have height 0).
-     faces: triangles indexing pts then ext — a low-poly relief used for facet shading and facet lines. */
+     pts: outline polygon. keys: the outline corners that get a crease to the facet center (always incl. the tip, 0).
+     c: the natural facet center. relief() turns this into a low-poly relief used for facet shading and lines. */
   const AX = (62 * Math.PI) / 180, UA = [Math.cos(AX), Math.sin(AX)], VA = [-Math.sin(AX), Math.cos(AX)];
   // symmetric shapes are authored along a 62° axis: a = distance along it, s = sideways
-  const ax = (a, s, z) => { const q = [a * UA[0] + s * VA[0], a * UA[1] + s * VA[1]]; return z === undefined ? q : [q[0], q[1], z]; };
-  const fan = (n, e) => Array.from({ length: n }, (_, i) => [i, (i + 1) % n, e]);
+  const ax = (a, s) => [a * UA[0] + s * VA[0], a * UA[1] + s * VA[1]];
   function fit(def, m = 0.98) {
-    const s = m / Math.max(...def.pts.map((q) => Math.max(q[0], q[1])));
-    def.pts = def.pts.map(([x, y]) => [x * s, y * s]);
-    def.ext = def.ext.map(([x, y, z]) => [x * s, y * s, z]);
+    const k = m / Math.max(...def.pts.map((q) => Math.max(q[0], q[1])));
+    def.pts = def.pts.map(([x, y]) => [x * k, y * k]);
+    def.c = [def.c[0] * k, def.c[1] * k];
     return def;
-  }
-  // gem cut: a raised flat table (outline shrunk toward c) with a ring of bevel facets
-  function gem(pts, c, t) {
-    const n = pts.length, faces = [];
-    const ext = pts.map(([x, y]) => [c[0] + (x - c[0]) * t, c[1] + (y - c[1]) * t, 1]);
-    for (let i = 0; i < n; i++) { const j = (i + 1) % n; faces.push([i, j, n + j], [i, n + j, n + i]); }
-    for (let i = 1; i < n - 1; i++) faces.push([n, n + i, n + i + 1]);
-    return fit({ pts, ext, faces });
   }
 
   const DEF = {
-    arrow: {
-      pts: [[0, 0], [0, 0.86], [0.2, 0.68], [0.33, 0.98], [0.46, 0.93], [0.33, 0.63], [0.58, 0.63]],
-      ext: [[0.19, 0.55, 1], [0.395, 0.955, 0.35]],
-      faces: [[0, 1, 7], [1, 2, 7], [7, 2, 5], [7, 5, 6], [0, 7, 6], [2, 3, 8], [8, 4, 5], [2, 8, 5]],
-    },
-    arrowNoTail: { pts: [[0, 0], [0, 0.86], [0.22, 0.66], [0.6, 0.62]], ext: [[0.17, 0.46, 1]], faces: fan(4, 4) },
+    arrow: { pts: [[0, 0], [0, 0.86], [0.2, 0.68], [0.33, 0.98], [0.46, 0.93], [0.33, 0.63], [0.58, 0.63]], keys: [0, 1, 6], c: [0.19, 0.55] },
+    arrowNoTail: { pts: [[0, 0], [0, 0.86], [0.22, 0.66], [0.6, 0.62]], keys: [0, 1, 3], c: [0.17, 0.46] },
     // folded along the line from the tip to the notch
-    pointer: { pts: [[0, 0], [0.7, 0.52], [0.32, 0.6], [0.14, 0.95]], ext: [[0.2, 0.375, 1]], faces: fan(4, 4) },
-    triangle: { pts: [[0, 0], [0.72, 0.4], [0.4, 0.72]], ext: [[0.3, 0.3, 1]], faces: fan(3, 3) },
+    pointer: { pts: [[0, 0], [0.7, 0.52], [0.32, 0.6], [0.14, 0.95]], keys: [0, 1, 2, 3], c: [0.2, 0.375] },
+    triangle: { pts: [[0, 0], [0.72, 0.4], [0.4, 0.72]], keys: [0, 1, 2], c: [0.3, 0.3] },
     // blade arrow: slanted wing and a tail that kicks out to the right
-    shard: {
-      pts: [[0, 0], [0.04, 0.86], [0.24, 0.7], [0.33, 0.99], [0.49, 0.91], [0.37, 0.64], [0.68, 0.6]],
-      ext: [[0.16, 0.42, 1], [0.29, 0.62, 0.7], [0.41, 0.95, 0.3]],
-      faces: [[0, 1, 7], [1, 2, 7], [7, 2, 8], [8, 2, 5], [8, 5, 6], [7, 8, 6], [0, 7, 6], [2, 3, 9], [9, 4, 5], [2, 9, 5]],
-    },
+    shard: { pts: [[0, 0], [0.04, 0.86], [0.24, 0.7], [0.33, 0.99], [0.49, 0.91], [0.37, 0.64], [0.68, 0.6]], keys: [0, 1, 6], c: [0.2, 0.5] },
     // paper plane: centre spine plus a keel down to the rear notch
-    dart: fit({ pts: [[0, 0], ax(1, 0.42), ax(0.64, 0), ax(1, -0.42)], ext: [ax(0.42, 0, 1)], faces: fan(4, 4) }),
+    dart: fit({ pts: [[0, 0], ax(1, 0.42), ax(0.64, 0), ax(1, -0.42)], keys: [0, 1, 2, 3], c: ax(0.42, 0) }),
     // kite-cut gem: long point, wide shoulders, short flat back
-    gem: gem([[0, 0], ax(0.6, 0.32), ax(0.92, 0.16), ax(0.92, -0.16), ax(0.6, -0.32)], ax(0.6, 0), 0.45),
-    // flying wing with a W-shaped trailing edge and a raised spine
-    stealth: fit({
-      pts: [[0, 0], ax(0.86, 0.4), ax(0.74, 0.24), ax(0.88, 0.12), ax(0.76, 0), ax(0.88, -0.12), ax(0.74, -0.24), ax(0.86, -0.4)],
-      ext: [ax(0.36, 0, 1), ax(0.6, 0, 0.7)],
-      faces: [[0, 1, 8], [8, 1, 2], [8, 2, 9], [9, 2, 3], [9, 3, 4], [0, 8, 7], [8, 7, 6], [8, 6, 9], [9, 6, 5], [9, 5, 4]],
-    }),
+    gem: fit({ pts: [[0, 0], ax(0.6, 0.32), ax(0.92, 0.16), ax(0.92, -0.16), ax(0.6, -0.32)], keys: [0, 1, 2, 3, 4], c: ax(0.6, 0) }),
+    // flying wing with a W-shaped trailing edge: creases to the wing tips and the rear centre
+    stealth: fit({ pts: [[0, 0], ax(0.86, 0.4), ax(0.74, 0.24), ax(0.88, 0.12), ax(0.76, 0), ax(0.88, -0.12), ax(0.74, -0.24), ax(0.86, -0.4)], keys: [0, 1, 4, 7], c: ax(0.45, 0) }),
   };
+
+  // distance along ray o + s·d (s > 0) to the first crossing of the polygon outline
+  function rayHit(P, o, d) {
+    let best = Infinity;
+    for (let i = 0; i < P.length; i++) {
+      const p = P[i], q = P[(i + 1) % P.length], e = [q[0] - p[0], q[1] - p[1]], w = [p[0] - o[0], p[1] - o[1]];
+      const den = d[0] * e[1] - d[1] * e[0];
+      if (Math.abs(den) < 1e-12) continue;
+      const t = (w[0] * e[1] - w[1] * e[0]) / den, r = (w[0] * d[1] - w[1] * d[0]) / den;
+      if (t > 1e-6 && r >= -1e-9 && r <= 1 + 1e-9 && t < best) best = t;
+    }
+    return best === Infinity ? 0 : best;
+  }
+
+  /* Low-poly relief: one raised center with a straight crease to each key corner, nothing else.
+     Every stretch of outline between two neighbouring keys forms ONE flat face with the center (its in-between
+     corners are put on that face's plane), so there are never extra edges.
+     The center moves along the central axis (tip -> natural center -> far outline): along -1..0..1 = toward the
+     tip .. natural spot .. toward the far end; side -1..1 = fraction of the way to the outline on either side
+     (+ = clockwise side, the wing on an arrow). It always stays inside the shape. */
+  function relief(def, along, side) {
+    const P = def.pts, n = P.length, K = def.keys;
+    const L0 = Math.hypot(def.c[0], def.c[1]), u = [def.c[0] / L0, def.c[1] / L0];
+    const Lend = rayHit(P, [0, 0], u) || L0 / 0.7, t0 = L0 / Lend;
+    const v = Math.max(-1, Math.min(1, along || 0));
+    const t = v < 0 ? t0 + v * (t0 - 0.12) : t0 + v * (0.92 - t0);
+    const a = [u[0] * t * Lend, u[1] * t * Lend], d = [u[1], -u[0]];
+    const sd = Math.max(-1, Math.min(1, side || 0)) * 0.85;
+    const off = sd >= 0 ? sd * rayHit(P, a, d) : sd * rayHit(P, a, [-d[0], -d[1]]);
+    const c = [a[0] + d[0] * off, a[1] + d[1] * off];
+    const z = new Array(n).fill(0), faces = [];
+    K.forEach((ka, i) => {
+      const kb = K[(i + 1) % K.length], face = [n, ka];
+      const e = [P[kb][0] - P[ka][0], P[kb][1] - P[ka][1]];
+      const dist = (q) => (q[0] - P[ka][0]) * -e[1] + (q[1] - P[ka][1]) * e[0];
+      const dc = dist(c) || 1e-6;
+      for (let j = (ka + 1) % n; j !== kb; j = (j + 1) % n) { face.push(j); z[j] = dist(P[j]) / dc; }
+      face.push(kb);
+      faces.push(face);
+    });
+    return { pts: P, ext: [[c[0], c[1], 1]], faces, z };
+  }
 
   function norm(x, y) { const l = Math.hypot(x, y) || 1; return [x / l, y / l]; }
   function norm3([x, y, z]) { const l = Math.hypot(x, y, z) || 1; return [x / l, y / l, z / l]; }
@@ -106,15 +127,16 @@
       return { path, rule: 'nonzero', hot: [cx, cy], box };
     }
 
-    const margin = k, round = p.join === 'round', a = (p.tilt * Math.PI) / 180;
+    const margin = k, round = p.join === 'round';
     // (chamfered corners use bevel joins; their outline bounds are covered by the miter estimate)
     const sz = p.size * (S - 2 * margin - 2 * ow);
-    const def = DEF[shape === 'arrow' && !p.tail ? 'arrowNoTail' : shape];
+    const def = relief(DEF[shape === 'arrow' && !p.tail ? 'arrowNoTail' : shape], p.facetCenter, p.facetSide);
     const tf = ([x, y]) => [x * sz * p.slim, y * sz];
-    let pts = U.rotPts(def.pts.map(tf), 0, 0, a);
+    // built untilted first (tilt is applied below, once its safe range is known)
+    let pts = def.pts.map(tf);
     // relief vertices (outline corners before chamfering + raised ridge points), z in px
     const zs = p.facetDepth * sz * 0.12;
-    let fv = pts.map(([x, y]) => [x, y, 0]).concat(U.rotPts(def.ext.map(tf), 0, 0, a).map(([x, y], i) => [x, y, def.ext[i][2] * zs]));
+    let fv = pts.map(([x, y], i) => [x, y, def.z ? def.z[i] * zs : 0]).concat(def.ext.map(tf).map(([x, y], i) => [x, y, def.ext[i][2] * zs]));
     if (p.join === 'bevel' && p.chamfer > 0) {
       const ch = p.chamfer * sz, out = [pts[0]];
       for (let i = 1; i < pts.length; i++) {
@@ -126,9 +148,30 @@
       }
       pts = out;
     }
-    // place the shape so its *outline* (incl. sharp miter tips) starts at the margin
-    const outer = ow > 0 ? offsetPoly(pts, ow, round) : pts;
-    const dx = margin - Math.min(...outer.map((q) => q[0])), dy = margin - Math.min(...outer.map((q) => q[1]));
+    /* The tip (hotspot) must always be the top-left-most point of the drawn cursor: every other point of the
+       outline must lie between "straight right" (0°) and "straight down" (90°) as seen from the tip.
+       Sharp joins: test the mitered outer outline from its own tip. Round joins: the stroke is a disk around
+       every point, so the plain outline from the plain tip decides. Tilt (a rigid rotation, which turns every
+       direction by the same angle) is clamped to the range that keeps all points inside that quarter. */
+    let outer = ow > 0 ? offsetPoly(pts, ow, round) : pts;
+    const ref = round ? pts : outer;
+    let lo = -Infinity, hi = Infinity;
+    for (let i = 1; i < ref.length; i++) {
+      const vx = ref[i][0] - ref[0][0], vy = ref[i][1] - ref[0][1];
+      if (Math.hypot(vx, vy) < 1e-6) continue;
+      const phi = Math.atan2(vy, vx);
+      lo = Math.max(lo, -phi); hi = Math.min(hi, Math.PI / 2 - phi);
+    }
+    const want = (p.tilt * Math.PI) / 180;
+    const a = lo <= hi ? Math.max(lo, Math.min(hi, want)) : (lo + hi) / 2; // (a shape wider than 90° can't comply; split the overflow)
+    if (a !== 0) {
+      pts = U.rotPts(pts, 0, 0, a);
+      outer = U.rotPts(outer, 0, 0, a);
+      fv = fv.map(([x, y, z]) => { const [rx, ry] = U.rotPts([[x, y]], 0, 0, a)[0]; return [rx, ry, z]; });
+    }
+    // anchor the tip's outline at the top-left margin (round joins: the stroke's disk around the tip)
+    const tipX = round ? pts[0][0] - ow : outer[0][0], tipY = round ? pts[0][1] - ow : outer[0][1];
+    const dx = margin - tipX, dy = margin - tipY;
     pts = pts.map(([x, y]) => [x + dx, y + dy]);
     fv = fv.map(([x, y, z]) => [x + dx, y + dy, z]);
     U.polyPath(path, pts);
@@ -156,9 +199,9 @@
   function facets(c, p, sh, k, W, H) {
     if (!sh.fv || (p.facets <= 0 && p.facetLines <= 0)) return;
     const fv = sh.fv, a = (p.lightAngle * Math.PI) / 180, Lt = norm3([Math.cos(a), Math.sin(a), 1.1]);
-    // face normals (z up), from the relief with at least a little depth so creases stay defined
+    // face normals (z up); faces are flat polygons, the first three vertices (center + crease corner + next) span the plane
     const nrm = sh.faces.map((f) => {
-      const [A, B, C] = f.map((i) => fv[i]);
+      const [A, B, C] = f.slice(0, 3).map((i) => fv[i]);
       const u = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], v = [C[0] - A[0], C[1] - A[1], C[2] - A[2]];
       const n = norm3([u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]);
       return n[2] < 0 ? n.map((q) => -q) : n;
@@ -166,21 +209,18 @@
     c.save();
     c.clip(sh.path, sh.rule);
     if (p.facets > 0) {
-      const lay = U.canvas(W, H), lc = lay.getContext('2d'), grow = 0.75;
+      const lay = U.canvas(W, H), lc = lay.getContext('2d');
+      lc.lineJoin = 'round'; lc.lineWidth = 1.5; // each face also stroked in its own tone: no anti-alias seams between faces
       sh.faces.forEach((f, fi) => {
-        const [A, B, C] = f.map((i) => fv[i]), n = nrm[fi];
+        const n = nrm[fi];
         const s = n[0] * Lt[0] + n[1] * Lt[1] + n[2] * Lt[2] - Lt[2]; // 0 = same as a flat face
         const t = (s > 0 ? s * 2.2 : s * 1.4) * p.facets;
         const g = Math.round(255 * Math.min(1, Math.max(0, 0.5 + 0.5 * t)));
-        const mx = (A[0] + B[0] + C[0]) / 3, my = (A[1] + B[1] + C[1]) / 3;
-        lc.fillStyle = `rgb(${g},${g},${g})`;
+        lc.fillStyle = lc.strokeStyle = `rgb(${g},${g},${g})`;
         lc.beginPath();
-        [A, B, C].forEach(([x, y], i) => {
-          const d = norm(x - mx, y - my);
-          lc[i ? 'lineTo' : 'moveTo'](x + d[0] * grow, y + d[1] * grow);
-        });
+        f.forEach((i, j) => lc[j ? 'lineTo' : 'moveTo'](fv[i][0], fv[i][1]));
         lc.closePath();
-        lc.fill();
+        lc.fill(); lc.stroke();
       });
       c.globalCompositeOperation = 'hard-light';
       c.drawImage(lay, 0, 0);
@@ -191,8 +231,8 @@
       // (outline edges belong to one face and are covered by the outline; a flat gem table has no creases)
       const seen = new Map();
       sh.faces.forEach((f, fi) => {
-        for (let i = 0; i < 3; i++) {
-          const key = [f[i], f[(i + 1) % 3]].sort((x, y) => x - y).join();
+        for (let i = 0; i < f.length; i++) {
+          const key = [f[i], f[(i + 1) % f.length]].sort((x, y) => x - y).join();
           (seen.get(key) || seen.set(key, []).get(key)).push(fi);
         }
       });
@@ -281,7 +321,7 @@
       { key: 'size', label: 'Size', type: 'range', min: 0.2, max: 1, step: 0.01, default: 0.75 },
       { key: 'slim', label: 'Width', type: 'range', min: 0.4, max: 1.6, step: 0.01, default: 1, show: (p) => !CENTERED.includes(p.shape) },
       { key: 'tail', label: 'Tail', type: 'bool', default: true, show: is('arrow') },
-      { key: 'tilt', label: 'Tilt', type: 'range', min: -45, max: 45, step: 1, default: 0, show: (p) => !CENTERED.includes(p.shape) },
+      { key: 'tilt', label: 'Tilt', type: 'range', min: -45, max: 45, step: 1, default: 0, show: (p) => !CENTERED.includes(p.shape), tip: 'Rotates around the tip. Limited per shape, so the tip always stays the top-left-most point of the cursor' },
       { key: 'lineW', label: 'Line thickness', type: 'range', min: 0.5, max: 12, step: 0.5, default: 3, show: is('ring', 'cross') },
       { key: 'crossGap', label: 'Center gap', type: 'range', min: 0, max: 16, step: 0.5, default: 3, show: is('cross') },
       { key: 'centerDot', label: 'Center dot', type: 'bool', default: true, show: is('ring', 'cross') },
@@ -304,6 +344,8 @@
       { type: 'section', label: 'Facets (low-poly)', show: (p) => !CENTERED.includes(p.shape) },
       { key: 'facets', label: 'Facet shading', type: 'range', min: 0, max: 1, step: 0.01, default: 0, show: (p) => !CENTERED.includes(p.shape), tip: 'Splits the shape into lit / shaded triangles (uses the light direction)' },
       { key: 'facetDepth', label: 'Facet depth', type: 'range', min: 0.2, max: 2.5, step: 0.05, default: 1, show: (p) => !CENTERED.includes(p.shape) && p.facets > 0, tip: 'How steep the facets are: stronger light / dark contrast' },
+      { key: 'facetCenter', label: 'Facet center', type: 'range', min: -1, max: 1, step: 0.01, default: 0, show: (p) => !CENTERED.includes(p.shape) && (p.facets > 0 || p.facetLines > 0), tip: 'Where all creases meet, moved along the central axis: - toward the tip, + toward the far end (0 = the shape\'s natural spot)' },
+      { key: 'facetSide', label: 'Facet center offset', type: 'range', min: -1, max: 1, step: 0.01, default: 0, show: (p) => !CENTERED.includes(p.shape) && (p.facets > 0 || p.facetLines > 0), tip: 'Moves the meeting point sideways off the central axis, as a fraction of the way to the outline: - one side, + the other (the wing on an arrow)' },
       { key: 'facetLines', label: 'Facet lines', type: 'range', min: 0, max: 2, step: 0.05, default: 0, show: (p) => !CENTERED.includes(p.shape), tip: 'px @ 64' },
       { key: 'facetLineColor', label: 'Facet line color', type: 'color', default: '#ffffff', show: (p) => p.facetLines > 0 && !CENTERED.includes(p.shape) },
 
@@ -330,6 +372,8 @@
       { key: 'glowSize', label: 'Glow size', type: 'range', min: 0.5, max: 16, step: 0.25, default: 4, show: (p) => p.glow },
       { key: 'glowAlpha', label: 'Glow strength', type: 'range', min: 0, max: 1, step: 0.01, default: 0.8, show: (p) => p.glow },
 
+      ...U.wearParams(),
+      { key: 'seed', label: 'Seed', type: 'seed', default: 7 },
       { type: 'section', label: 'Pixel art', collapsed: true },
       { key: 'pixel', label: 'Pixel-art mode', type: 'bool', default: false, tip: 'Render on a small grid, hard alpha, nearest-neighbour upscale' },
       { key: 'grid', label: 'Grid', type: 'select', default: 32, options: [[16, '16 px'], [24, '24 px'], [32, '32 px'], [48, '48 px'], [64, '64 px']], show: (p) => p.pixel },
@@ -413,16 +457,41 @@
       { name: 'Outlined ghost', group: 'Greyscale', values: { fill: '#ffffff', outlineW: 1.75, outlineColor: '#3f3f46', outline2: true, outline2W: 0.75, outline2Color: '#ffffff', join: 'round', shadow: false } },
       { name: 'Charcoal shard', group: 'Greyscale', values: { shape: 'shard', fill: '#27272a', outlineW: 1.25, outlineColor: '#e4e4e7', facets: 0.7, facetLines: 0.3, facetLineColor: '#71717a', shadowX: 0.75, shadowY: 2, shadowBlur: 4, shadowAlpha: 0.3 } },
       { name: 'Grey low-poly gem', group: 'Greyscale', values: { shape: 'gem', size: 0.8, fill: '#a1a1aa', outlineW: 1, outlineColor: '#18181b', facets: 0.85, facetLines: 0.35, facetLineColor: '#f4f4f5', shadowX: 0.75, shadowY: 2, shadowBlur: 4, shadowAlpha: 0.3 } },
+      // Post-apocalyptic: rust, scrap, dirt and wear
+      { name: 'Scavenger cursor (rusted)', group: 'Post-apocalyptic', values: { shape: 'arrow', fillMode: 'linear', fill: '#b8432a', fill2: '#6a1e10', gradAngle: 60, outlineW: 2.5, outlineColor: '#1c120c', colorNoise: 0.45, noiseColor: '#5a3a1a', noiseScale: 4, brightNoise: 0.15, distort: 0.06, grunge: 0.3, grungeType: 'chipped', grungeScale: 6, edgeWear: 0.6, dirt: 0.4, dirtColor: '#2a1a0c', scratches: 0.4, scratches: 0.25, shadowAlpha: 0.5, seed: 31 } },
+      { name: 'Scrap metal pointer', group: 'Post-apocalyptic', values: { shape: 'shard', fillMode: 'linear', fill: '#7a6a56', fill2: '#3a3026', gradAngle: 60, outlineW: 2, outlineColor: '#15100b', facets: 0.45, colorNoise: 0.45, noiseColor: '#5a3a1a', noiseScale: 4, brightNoise: 0.15, distort: 0.06, grunge: 0.3, grungeType: 'chipped', grungeScale: 6, edgeWear: 0.6, dirt: 0.4, dirtColor: '#2a1a0c', scratches: 0.4, noiseColor: '#7a3e18', scratches: 0.3, shadowAlpha: 0.5, seed: 13 } },
+      { name: 'Bone-white wasteland', group: 'Post-apocalyptic', values: { shape: 'arrow', fill: '#d8d0bc', outlineW: 2, outlineColor: '#2a2420', colorNoise: 0.3, noiseColor: '#8a7a5a', noiseScale: 5, distort: 0.05, grunge: 0.22, grungeType: 'speckle', grungeScale: 9, edgeWear: 0.45, dirt: 0.5, dirtColor: '#4a3a24', scratches: 0.3, shadowAlpha: 0.45, seed: 5 } },
+      { name: 'Radiation cursor', group: 'Post-apocalyptic', values: { shape: 'pointer', fillMode: 'linear', fill: '#c8e03a', fill2: '#5a7a10', gradAngle: 60, outlineW: 2, outlineColor: '#141608', glow: true, glowColor: '#b4ff3a', glowSize: 3, glowAlpha: 0.6, colorNoise: 0.3, noiseColor: '#3a4a10', distort: 0.05, grunge: 0.25, grungeType: 'chipped', grungeScale: 7, edgeWear: 0.5, dirt: 0.35, scratches: 0.25, shadow: false, seed: 9 } },
     ],
     render(ctx, W, H, p) {
       const k = Math.min(W, H) / 64;
-      const layer = U.canvas(W, H);
+      let layer = U.canvas(W, H);
       let hot, gw = W;
+      /* wear (noise, grunge, distortion) on the drawn cursor, before shadow and glow, so they follow the worn
+         shape. The tip stays intact: the unworn cursor is blended back in a small soft circle around the hotspot. */
+      const wear = (cv, w, h, hp) => {
+        if (!U.wearActive(p)) return cv;
+        const S = Math.min(w, h), F = U.wearFields(w, h, p, S, cv);
+        const out = U.imageCanvas(U.wearApply(cv, p, F)), oc = out.getContext('2d');
+        U.wearScratches(oc, w, h, p, S);
+        if (hp) {
+          const r = Math.max(2, (S / 64) * 5), keep = U.canvas(w, h), kc = keep.getContext('2d');
+          kc.drawImage(cv, 0, 0);
+          kc.globalCompositeOperation = 'destination-in';
+          const g = kc.createRadialGradient(hp[0], hp[1], 0, hp[0], hp[1], r);
+          g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.55, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+          kc.fillStyle = g; kc.fillRect(0, 0, w, h);
+          oc.drawImage(keep, 0, 0);
+        }
+        return out;
+      };
       if (p.pixel) {
         gw = W >= H ? p.grid : Math.max(1, Math.round((p.grid * W) / H));
         const gh = W >= H ? Math.max(1, Math.round((p.grid * H) / W)) : p.grid;
-        const small = U.canvas(gw, gh), sc = small.getContext('2d');
-        hot = draw(sc, gw, gh, p);
+        let small = U.canvas(gw, gh);
+        hot = draw(small.getContext('2d'), gw, gh, p);
+        small = wear(small, gw, gh, CENTERED.includes(p.shape) ? null : hot);
+        const sc = small.getContext('2d');
         const img = sc.getImageData(0, 0, gw, gh), d = img.data;
         for (let i = 3; i < d.length; i += 4) d[i] = d[i] >= 110 ? 255 : 0;
         sc.putImageData(img, 0, 0);
@@ -432,6 +501,7 @@
         hot = [(Math.floor(hot[0]) + 0.5) / gw, (Math.floor(hot[1]) + 0.5) / gh];
       } else {
         hot = draw(layer.getContext('2d'), W, H, p);
+        layer = wear(layer, W, H, CENTERED.includes(p.shape) ? null : hot);
         hot = [hot[0] / W, hot[1] / H];
       }
 

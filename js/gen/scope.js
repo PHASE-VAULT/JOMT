@@ -14,7 +14,9 @@
     bdc: 'none', bdcStem: false, bdcCount: 4, bdcStart: 40, bdcSpacing: 30, bdcGrowth: 0.15, bdcWidth: 60, bdcNumbers: false, bdcFirst: 4, bdcStep: 1,
     sideMarkers: 0, prism: false, rangefinder: false,
     color: '#0b0b0b', accent: '#ffffff', // white accent = tint it in-engine (multiply)
-    hashAccent: false, glow: false, glowSize: 8,
+    hashAccent: false, glow: false, glowSize: 8, glowStrength: 1,
+    // emissive (illuminated) parts: drawn in the accent color, glow + emissive export layer
+    emLines: false, emPosts: false, emCenter: true, emPrism: true, emRange: false,
   };
   const PRESETS = {
     duplex: { posts: 'flat' },
@@ -51,6 +53,7 @@
     desc: 'Scope overlay: reticle presets, lens mask, housing ring',
     tags: ['UI', 'Shooter'],
     bg: 'gray',
+    exportLayers: (p) => (p.split ? (p.reticleOnly ? [] : [{ id: 'lens', suffix: 'lens' }]).concat([{ id: 'reticle', suffix: 'reticle' }, { id: 'emissive', suffix: 'emissive' }]) : null),
     icon: U.icon('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v6M12 14.5v6M3.5 12h6M14.5 12h6"/><circle cx="12" cy="12" r=".8" fill="currentColor"/>'),
     params: [
       { type: 'section', label: 'Reticle (px @ 512)' },
@@ -64,11 +67,9 @@
       },
       { key: 'reticleOnly', label: 'Reticle only (no lens/mask/housing)', type: 'bool', default: false, tip: 'Transparent output with just the sight, clipped to the lens circle' },
       P('color', 'Line color', 'color', BASE.color),
-      P('accent', 'Accent / illuminated', 'color', BASE.accent, { tip: 'White by default so it can be multiplied with any color in-engine' }),
+      P('accent', 'Emissive color', 'color', BASE.accent, { tip: 'Color of all parts marked emissive. White by default so it can be multiplied with any color in-engine' }),
       R('thickness', 'Line thickness', 0.5, 12, 0.5),
       R('scale', 'Reticle scale', 0.3, 3, 0.01),
-      P('glow', 'Illumination glow', 'bool', BASE.glow, { tip: 'Glow on accent-colored parts' }),
-      R('glowSize', 'Glow size', 1, 40, 0.5, { show: (p) => p.glow }),
 
       { type: 'section', label: 'Crosshair lines', collapsed: true },
       P('lines', 'Thin crosshair', 'bool', BASE.lines),
@@ -106,7 +107,6 @@
       P('majorEvery', 'Major every', 'int', BASE.majorEvery, { min: 0, max: 10, show: (p) => p.hash && p.hashStyle === 'ticks', tip: '0 = no major ticks' }),
       R('majorLen', 'Major length', 1, 60, 0.5, { show: (p) => p.hash && p.hashStyle === 'ticks' && p.majorEvery > 0 }),
       P('hashNumbers', 'Numbers on majors', 'bool', BASE.hashNumbers, { show: (p) => p.hash && p.hashStyle === 'ticks' && p.majorEvery > 0 }),
-      P('hashAccent', 'Use accent color', 'bool', BASE.hashAccent, { tip: 'Hash marks and BDC in the accent color' }),
 
       { type: 'section', label: 'Bullet drop (BDC)', collapsed: true },
       P('bdc', 'BDC', 'select', BASE.bdc, { options: [['none', 'None'], ['stadia', 'Stadia lines'], ['ticks', 'Ticks'], ['dots', 'Dots']] }),
@@ -125,6 +125,18 @@
       P('prism', 'Prism arc + brackets', 'bool', BASE.prism),
       P('rangefinder', 'Rangefinder scale', 'bool', BASE.rangefinder),
 
+      { type: 'section', label: 'Bloom', active: (p) => p.glow },
+      P('glow', 'Illumination glow', 'bool', BASE.glow, { tip: 'One glow, applied equally to every emissive part' }),
+      R('glowSize', 'Glow size', 1, 40, 0.5, { show: (p) => p.glow }),
+      R('glowStrength', 'Glow strength', 0, 4, 0.05, { show: (p) => p.glow, tip: '1 = standard, higher = brighter halo' }),
+      { type: 'section', label: 'Emissive parts' },
+      P('emLines', 'Crosshair lines', 'bool', BASE.emLines),
+      P('emPosts', 'Posts', 'bool', BASE.emPosts),
+      P('emCenter', 'Center element', 'bool', BASE.emCenter),
+      P('hashAccent', 'Hash marks, BDC & side triangles', 'bool', BASE.hashAccent),
+      P('emPrism', 'Prism arc + brackets', 'bool', BASE.emPrism),
+      P('emRange', 'Rangefinder scale', 'bool', BASE.emRange),
+
       { type: 'section', label: 'Lens' },
       { key: 'lens', label: 'Lens size', type: 'range', min: 0.3, max: 1, step: 0.01, default: 0.86 },
       { key: 'soft', label: 'Edge softness', type: 'range', min: 0, max: 0.4, step: 0.01, default: 0.04, show: (p) => !p.reticleOnly },
@@ -138,6 +150,10 @@
       { key: 'housingW', label: 'Ring width', type: 'range', min: 2, max: 120, step: 0.5, default: 26, show: (p) => p.housing },
       { key: 'housingColor', label: 'Ring color', type: 'color', default: '#2b2a26', show: (p) => p.housing },
       { key: 'housingShade', label: 'Bevel', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, show: (p) => p.housing },
+
+      { type: 'section', label: 'Output' },
+      { key: 'split', label: 'Separate layer export', type: 'bool', default: false, tip: 'Download lens / overlay, non-emissive reticle and emissive reticle as separate, aligned PNGs. Stack in the engine (bottom to top): reticle, emissive, lens' },
+      { key: 'view', label: 'Preview layer', type: 'select', default: 'all', options: [['all', 'Everything (combined)'], ['lens', 'Lens, mask & housing'], ['reticle', 'Reticle (non-emissive)'], ['emissive', 'Emissive reticle + glow']], tip: 'Preview only, the export uses the settings above' },
     ].map((d) => (d.key && d.key in DEFAULTS ? Object.assign(d, { default: DEFAULTS[d.key] }) : d)),
     presets: [
       // Realistic: real-world optic types, built on the internal reticle presets
@@ -170,6 +186,15 @@
       { name: 'Halo-style sniper', group: 'Game-inspired', values: { preset: 'custom', lines: true, lineGap: 40, lineExtent: 0.8, thickness: 1.5, posts: 'none', hash: false, center: 'circle', centerSize: 30, centerThick: 2, ringTicks: true, rangefinder: true, color: '#9ad8ff', accent: '#9ad8ff', glow: true, glowSize: 8, maskColor: '#060c14', tintAmt: 0.35, tint: '#1a5a8a', vignette: 0.5, housingColor: '#3a4450', housingW: 22 } },
       { name: 'Doom-style precision bolt', group: 'Game-inspired', values: { preset: 'ta11', accent: '#ff6a1a', hashAccent: true, glow: true, glowSize: 10, sideMarkers: 2, maskColor: '#140202', tintAmt: 0.3, tint: '#8a1a0a', vignette: 0.7, housingColor: '#3a2a22', housingW: 40, housingShade: 0.8 } },
 
+      // Night vision & thermal: digital / phosphor views, the reticle is illuminated (emissive) so it reads on a bright image
+      { name: 'NV green phosphor', group: 'Night vision & thermal', values: { preset: 'fine', thickness: 1.5, lineGap: 10, center: 'dot', dotSize: 4, emLines: true, color: '#b6ffa8', accent: '#c8ffb8', glow: true, glowSize: 8, maskColor: '#000000', tintAmt: 0.55, tint: '#2ee84a', vignette: 0.9, soft: 0.14, housingColor: '#141414', housingW: 30 } },
+      { name: 'NV white phosphor', group: 'Night vision & thermal', values: { preset: 'duplex', thickness: 1.5, postW: 6, center: 'dot', dotSize: 4, emLines: true, emPosts: true, color: '#eef6ff', accent: '#eef6ff', glow: true, glowSize: 7, maskColor: '#000000', tintAmt: 0.42, tint: '#b8cce0', vignette: 0.9, soft: 0.14, housingColor: '#161616', housingW: 30 } },
+      { name: 'NV mil-dot (illuminated)', group: 'Night vision & thermal', values: { preset: 'mildot', thickness: 1.5, center: 'dot', dotSize: 4, emLines: true, hashAccent: true, color: '#a8ff9a', accent: '#a8ff9a', glow: true, glowSize: 6, tintAmt: 0.5, tint: '#22d040', vignette: 0.85, soft: 0.1, housingColor: '#1a1d18', housingW: 34 } },
+      { name: 'Thermal white-hot', group: 'Night vision & thermal', values: { preset: 'custom', lines: true, lineExtent: 0.75, lineGap: 18, thickness: 1.5, posts: 'none', center: 'dot', dotSize: 3, hash: true, hashStyle: 'ticks', hashSpacing: 18, hashCount: 6, hashLen: 6, majorEvery: 0, hashGap: 18, emLines: true, hashAccent: true, color: '#ffffff', accent: '#ffffff', glow: false, maskColor: '#050505', tintAmt: 0.32, tint: '#7a7a7a', vignette: 0.45, soft: 0.03, housingColor: '#202224', housingW: 26, housingShade: 0.3 } },
+      { name: 'Thermal black-hot', group: 'Night vision & thermal', values: { preset: 'custom', lines: true, lineExtent: 0.75, lineGap: 18, thickness: 2, posts: 'none', center: 'dot', dotSize: 4, hash: true, hashStyle: 'ticks', hashSpacing: 18, hashCount: 6, hashLen: 6, majorEvery: 0, hashGap: 18, color: '#0a0a0a', accent: '#ff2a1a', glow: true, glowSize: 4, maskColor: '#050505', tintAmt: 0.45, tint: '#c4c4c4', vignette: 0.4, soft: 0.03, housingColor: '#202224', housingW: 26, housingShade: 0.3 } },
+      { name: 'Thermal ironbow', group: 'Night vision & thermal', values: { preset: 'hhs', centerSize: 30, centerThick: 2, dotSize: 3, lines: true, lineGap: 44, lineExtent: 0.7, thickness: 1.5, emLines: true, color: '#9cff6a', accent: '#9cff6a', glow: true, glowSize: 5, maskColor: '#06030c', tintAmt: 0.45, tint: '#5a1a8a', vignette: 0.55, soft: 0.04, housingColor: '#1c1a22', housingW: 26 } },
+      { name: 'Thermal digital rangefinder', group: 'Night vision & thermal', values: { preset: 'custom', hash: false, lines: true, lineExtent: 0.5, lineGap: 22, thickness: 1.5, posts: 'flat', postStart: 0.62, postW: 4, emPosts: true, center: 'circle', centerSize: 10, centerThick: 1.5, ringTicks: true, rangefinder: true, emRange: true, emLines: true, color: '#e8f0e8', accent: '#e8f0e8', glow: true, glowSize: 3, maskColor: '#030303', tintAmt: 0.3, tint: '#5c5c5c', vignette: 0.5, soft: 0.03, housingColor: '#1e2022', housingW: 24, housingShade: 0.3, split: true } },
+
       // Sci-fi
       { name: 'Holo HUD (reticle only)', group: 'Sci-fi', values: { preset: 'prism', reticleOnly: true, accent: '#40e8ff', color: '#40e8ff', glow: true, glowSize: 10, lens: 0.9 } },
       { name: 'Plasma rifle optic', group: 'Sci-fi', values: { preset: 'hamr', color: '#c0a0ff', accent: '#ff40ff', hashAccent: true, glow: true, glowSize: 12, maskColor: '#0a0018', tintAmt: 0.35, tint: '#4a1a8a', vignette: 0.6, housingColor: '#2a2a40', housingW: 30, housingShade: 0.9 } },
@@ -177,12 +202,16 @@
       { name: 'Orbital targeting', group: 'Sci-fi', values: { preset: 'vudu', hashCount: 12, hashSpacing: 16, hashLen: 4, majorEvery: 4, majorLen: 12, hashNumbers: true, center: 'circle', centerSize: 14, centerThick: 2, accent: '#ffd23a', glow: true, glowSize: 6, maskColor: '#020a0a', tintAmt: 0.3, tint: '#0a6a6a', vignette: 0.4, housingColor: '#1a2a2a', housingW: 16 } },
     ],
 
-    render(ctx, W, H, p) {
+    render(ctx, W, H, p, opts) {
+      opts = opts || {};
+      // one layer of a separate export, or the preview layer picked in Output; 'all' = combined image
+      const view = opts.layer || (opts.preview ? p.view || 'all' : 'all');
+      const want = (l) => view === 'all' || view === l;
       const S = Math.min(W, H), k = S / 512, cx = W / 2, cy = H / 2, Rl = (p.lens * S) / 2, TAU = U.TAU;
       const sc = k * p.scale, t = Math.max(0.5, p.thickness * k);
 
       const only = p.reticleOnly;
-      if (!only && p.tintAmt > 0) {
+      if (!only && p.tintAmt > 0 && want('lens')) {
         ctx.fillStyle = U.rgba(p.tint, p.tintAmt);
         ctx.beginPath(); ctx.arc(cx, cy, Rl, 0, TAU); ctx.fill();
       }
@@ -198,14 +227,15 @@
       const main = layer(p.color), acc = layer(p.accent), hashL = p.hashAccent ? acc : main;
       // posts that reach past the lens get their own layer: under the lens mask + housing like the rest of the
       // reticle, but not clipped to the lens circle in reticle-only mode (there they run to the image edge)
-      const postsOut = p.posts !== 'none' && p.postEnd * (Math.max(W, H) / 2) > Rl, postL = postsOut ? layer(p.color) : main;
+      const em = (on) => (on ? acc : main); // emissive parts are drawn in the accent color
+      const postsOut = p.posts !== 'none' && p.postEnd * (Math.max(W, H) / 2) > Rl, postL = postsOut ? layer(p.emPosts ? p.accent : p.color) : em(p.emPosts);
       const hl = (g, x0, x1, y, th) => g.fillRect(x0, y - th / 2, x1 - x0, th);
       const vl = (g, y0, y1, x, th) => g.fillRect(x - th / 2, y0, th, y1 - y0);
       const disc = (g, x, y, r) => { g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); };
 
       /* thin crosshair */
       if (p.lines) {
-        const g = main.g, E = p.lineExtent * Rl, gap = p.lineGap * sc;
+        const g = em(p.emLines).g, E = p.lineExtent * Rl, gap = p.lineGap * sc;
         hl(g, -E, -gap, 0, t); hl(g, gap, E, 0, t); vl(g, gap, E, 0, t);
         if (p.lineTop) vl(g, -E, -gap, 0, t);
       }
@@ -288,7 +318,7 @@
 
       /* center element */
       {
-        const g = acc.g, cs = p.centerSize * sc, ct = Math.max(0.5, p.centerThick * sc), dr = (p.dotSize * sc) / 2;
+        const g = em(p.emCenter).g, cs = p.centerSize * sc, ct = Math.max(0.5, p.centerThick * sc), dr = (p.dotSize * sc) / 2;
         g.lineWidth = ct;
         switch (p.center) {
           case 'dot': disc(g, 0, 0, dr); break;
@@ -331,7 +361,7 @@
       if (p.prism) {
         /* Prism-style: thick top arc, two short bottom arc segments, thin side brackets on the same
            circle, and wing dots next to the center. All concentric with the aim point. */
-        const g = acc.g, pr = 58 * sc, lw = 8 * sc, bt = Math.max(1, 2.4 * sc), deg = Math.PI / 180;
+        const g = em(p.emPrism).g, pr = 58 * sc, lw = 8 * sc, bt = Math.max(1, 2.4 * sc), deg = Math.PI / 180;
         const seg = (a0, a1) => { g.beginPath(); g.arc(0, 0, pr, a0 * deg, a1 * deg); g.stroke(); };
         g.lineWidth = lw; g.lineCap = 'butt';
         seg(-90 - 58, -90 + 58);          // top arc
@@ -349,7 +379,7 @@
         }
       }
       if (p.rangefinder) {
-        const g = main.g, x0 = -Rl * 0.72, x1 = -Rl * 0.2, y0 = Rl * 0.5, h = Rl * 0.16, th = Math.max(0.5, t * 0.8);
+        const g = em(p.emRange).g, x0 = -Rl * 0.72, x1 = -Rl * 0.2, y0 = Rl * 0.5, h = Rl * 0.16, th = Math.max(0.5, t * 0.8);
         hl(g, x0, x1, y0, th);
         g.lineWidth = th;
         g.beginPath();
@@ -366,20 +396,41 @@
         });
       }
 
-      /* composite: main lines, then accent (optionally glowing) */
-      ctx.save();
-      if (only) { ctx.beginPath(); ctx.arc(cx, cy, Rl, 0, TAU); ctx.clip(); } // the mask normally hides the overshoot
-      ctx.drawImage(main.c, 0, 0);
-      if (postsOut && !only) ctx.drawImage(postL.c, 0, 0);
-      if (p.glow) {
+      /* composite: non-emissive lines, then the emissive parts (optionally glowing). Posts that reach past
+         the lens sit on their own layer (postL), emissive or not. */
+      const sep = view !== 'all';
+      const reticleLayer = (l) => {
         ctx.save();
-        ctx.shadowColor = p.accent; ctx.shadowBlur = p.glowSize * k;
-        ctx.drawImage(acc.c, 0, 0); ctx.drawImage(acc.c, 0, 0);
+        // reticle-only clips to the lens (posts excepted); a separate layer clips to the lens too, because
+        // there the mask that normally hides the overshoot is a different texture
+        if (only || sep) { ctx.beginPath(); ctx.arc(cx, cy, Rl, 0, TAU); ctx.clip(); }
+        if (l === 'reticle') {
+          ctx.drawImage(main.c, 0, 0);
+          if (postsOut && !p.emPosts && !only) ctx.drawImage(postL.c, 0, 0);
+        } else {
+          // every emissive part goes into one image first, so the glow treats them all the same
+          let E = acc.c;
+          if (postsOut && p.emPosts && !only) {
+            E = U.canvas(W, H);
+            const e = E.getContext('2d');
+            e.drawImage(acc.c, 0, 0); e.drawImage(postL.c, 0, 0);
+          }
+          const gs = p.glow ? Math.max(0, p.glowStrength == null ? 1 : p.glowStrength) * 2 : 0; // 1 = two glow passes
+          if (gs > 0) {
+            ctx.save();
+            ctx.shadowColor = p.accent; ctx.shadowBlur = p.glowSize * k;
+            for (let i = 0; i < Math.ceil(gs); i++) { ctx.globalAlpha = Math.min(1, gs - i); ctx.drawImage(E, 0, 0); }
+            ctx.restore();
+          }
+          ctx.drawImage(E, 0, 0);
+        }
         ctx.restore();
-      }
-      ctx.drawImage(acc.c, 0, 0);
-      ctx.restore();
-      if (only) { if (postsOut) ctx.drawImage(postL.c, 0, 0); return; }
+        // reticle-only: posts run out to the image edge, unclipped
+        if (only && postsOut && (l === 'reticle') !== !!p.emPosts) ctx.drawImage(postL.c, 0, 0);
+      };
+      if (want('reticle')) reticleLayer('reticle');
+      if (want('emissive')) reticleLayer('emissive');
+      if (only || !want('lens')) return;
 
       /* lens mask: opaque outside, soft edge, inner shadow */
       const m = U.canvas(W, H), mg = m.getContext('2d');

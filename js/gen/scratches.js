@@ -28,6 +28,12 @@
       { key: 'taper', label: 'Taper ends', type: 'bool', default: true },
       { key: 'opMin', label: 'Min opacity', type: 'range', min: 0, max: 1, step: 0.01, default: 0.25 },
       { key: 'opMax', label: 'Max opacity', type: 'range', min: 0, max: 1, step: 0.01, default: 0.95 },
+      { type: 'section', label: 'Vignette falloff', active: (p) => p.vignette > 0 },
+      { key: 'vignette', label: 'Clean center', type: 'range', min: 0, max: 1, step: 0.01, default: 0, tip: 'Keeps the center scratch-free so scratches only appear toward the edges (1 = completely clean center). Breaks seamless tiling' },
+      { key: 'vigSize', label: 'Clean area size', type: 'range', min: 0, max: 1, step: 0.01, default: 0.3, show: (p) => p.vignette > 0, tip: 'How far the clean area reaches out from the center (fraction of the way to the corners)' },
+      { key: 'vigSoft', label: 'Softness', type: 'range', min: 0.05, max: 1, step: 0.01, default: 0.6, show: (p) => p.vignette > 0, tip: 'How gradually the scratches fade in toward the edges' },
+      { key: 'vigShape', label: 'Shape', type: 'select', default: 'ellipse', options: [['ellipse', 'Ellipse (fits aspect)'], ['circle', 'Circle']], show: (p) => p.vignette > 0 },
+      { key: 'vigInvert', label: 'Invert (scratches in the center)', type: 'bool', default: false, show: (p) => p.vignette > 0 },
       { type: 'section', label: 'Output' },
       { key: 'mode', label: 'Output', type: 'select', default: 'mask', options: [['mask', 'White on black (mask)'], ['overlay', 'Overlay (transparent)'], ['color', 'Scratches over base color']] },
       { key: 'color', label: 'Scratch color', type: 'color', default: '#e8e6e0', show: (p) => p.mode !== 'mask' },
@@ -59,6 +65,9 @@
       const S = Math.min(W, H), k = S / 512, rnd = U.rng(p.seed), STEPS = 14;
       if (p.mode === 'mask') { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); }
       else if (p.mode === 'color') { ctx.fillStyle = p.base; ctx.fillRect(0, 0, W, H); }
+      // with a vignette falloff the scratches go on their own layer first, which is then faded and composited
+      const out = ctx, vig = p.vignette > 0, layer = vig ? U.canvas(W, H) : null;
+      if (vig) ctx = layer.getContext('2d');
       ctx.fillStyle = p.mode === 'mask' ? '#ffffff' : p.color;
       const lmin = Math.min(p.lenMin, p.lenMax), lmax = Math.max(p.lenMin, p.lenMax);
       const wmin = Math.min(p.wMin, p.wMax), wmax = Math.max(p.wMin, p.wMax);
@@ -107,6 +116,25 @@
         }
       }
       ctx.globalAlpha = 1;
+      if (vig) {
+        // elliptical (or circular) mask: the clean center keeps (1 - amount) of the scratches, full strength toward the corners
+        const circle = p.vigShape === 'circle';
+        const rx = circle ? Math.hypot(W, H) / 2 : (W / 2) * Math.SQRT2, ry = circle ? rx : (H / 2) * Math.SQRT2;
+        const a0 = U.clamp(p.vigSize), a1 = Math.min(1, a0 + p.vigSoft);
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.translate(W / 2, H / 2);
+        ctx.scale(rx, ry);
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+        for (let i = 0; i <= 16; i++) {
+          const t = i / 16, m = U.smoothstep(a0, a1, t); // 0 in the center, 1 toward the corners
+          g.addColorStop(t, 'rgba(0,0,0,' + U.clamp(p.vigInvert ? 1 - p.vignette * m : 1 - p.vignette * (1 - m)) + ')');
+        }
+        ctx.fillStyle = g;
+        ctx.fillRect(-2, -2, 4, 4);
+        ctx.restore();
+        out.drawImage(layer, 0, 0);
+      }
     },
   });
 })();

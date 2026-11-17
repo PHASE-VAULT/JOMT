@@ -439,6 +439,10 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 3px; }
   font-size: 12px;
 }
 .list-btns { display: flex; gap: 4px; }
+/* action button rows (param type "button") */
+.btn-row { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+.btn-row .btn { flex: 1 1 auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.btn-row .btn svg { width: 15px; height: 15px; }
 .btn.ghost { background: none; border-color: var(--line); color: var(--muted); }
 .btn.ghost:hover { color: var(--text); }
 .list-item-title {

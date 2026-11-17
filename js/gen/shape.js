@@ -28,6 +28,7 @@
       },
       { key: 'w', label: 'Width', type: 'range', min: 0.02, max: 1, step: 0.01, default: 0.7 },
       { key: 'h', label: 'Height', type: 'range', min: 0.02, max: 1, step: 0.01, default: 0.7 },
+      { key: 'equilateral', label: 'Equilateral', type: 'bool', default: true, show: is('triangle'), tip: 'All three sides equal, fitted inside width × height. Off: the triangle stretches to the box' },
       { key: 'sides', label: 'Sides / points', type: 'int', min: 3, max: 24, default: 6, show: is('polygon', 'star') },
       { key: 'inner', label: 'Inner radius', type: 'range', min: 0.05, max: 0.95, step: 0.01, default: 0.5, show: is('star', 'ring') },
       { key: 'thick', label: 'Bar thickness', type: 'range', min: 0.05, max: 0.9, step: 0.01, default: 0.3, show: is('cross', 'arrow') },
@@ -90,7 +91,13 @@
         case 'rect': U.polyPath(ctx, rect, r); break;
         case 'ellipse': ctx.ellipse(0, 0, ax, ay, 0, 0, U.TAU); break;
         case 'capsule': U.polyPath(ctx, rect, Math.min(ax, ay)); break;
-        case 'triangle': U.polyPath(ctx, [[0, -ay], [ax, ay], [-ax, ay]], r); break;
+        case 'triangle': {
+          // equilateral: the largest equal-sided triangle that fits the width × height box
+          let tx = ax, ty = ay;
+          if (p.equilateral !== false) { tx = Math.min(ax, (ay * 2) / Math.sqrt(3)); ty = (tx * Math.sqrt(3)) / 2; }
+          U.polyPath(ctx, [[0, -ty], [tx, ty], [-tx, ty]], p.radius * 2 * Math.min(tx, ty));
+          break;
+        }
         case 'rtriangle': U.polyPath(ctx, [[-ax, -ay], [ax, ay], [-ax, ay]], r); break;
         case 'diamond': U.polyPath(ctx, [[0, -ay], [ax, 0], [0, ay], [-ax, 0]], r); break;
         case 'polygon': U.polyPath(ctx, ngon(p.sides, ax, ay), r); break;

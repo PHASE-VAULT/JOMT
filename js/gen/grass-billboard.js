@@ -25,6 +25,7 @@
       { key: 'tuftWidth', label: 'Tuft width', type: 'range', min: 0.01, max: 1, step: 0.01, default: 0.12, tip: 'Fraction of the card width' },
       { key: 'scatter', label: 'Loose blades', type: 'range', min: 0, max: 1, step: 0.01, default: 0.15, tip: 'Share of blades placed anywhere instead of in a tuft' },
       { key: 'margin', label: 'Side margin', type: 'range', min: 0, max: 0.45, step: 0.01, default: 0.06, tip: 'Empty space kept at the left / right edge; the plant is scaled down if it would not fit' },
+      { key: 'fit', label: 'Fit', type: 'select', default: 'height', options: [['height', 'True height (squeeze sideways)'], ['uniform', 'Keep proportions (scale down)']], tip: 'True height: blade heights are fractions of the card height and a plant that is too wide is narrowed. Keep proportions: the whole plant shrinks until it fits' },
       { key: 'ground', label: 'Ground line', type: 'range', min: 0, max: 0.4, step: 0.005, default: 0.02, tip: 'Height of the root line above the bottom edge' },
       { key: 'rootJitter', label: 'Root depth variation', type: 'range', min: 0, max: 0.3, step: 0.005, default: 0.04 },
       { key: 'seed', label: 'Seed', type: 'seed', default: 5 },
@@ -91,10 +92,6 @@
       { name: 'Toxic wasteland', group: 'Sci-fi', values: { root: '#1a2a0a', tip: '#c0ff20', dry: '#6a5a20', dryAmt: 0.4, heads: 0.08, headColor: '#e0ff60', bend: 1 } },
     ],
     render(out, W, H, p) {
-      // plants are drawn on a transparent canvas 3x as wide (card in the middle third), then fitted
-      const off = U.canvas(W * 3, H);
-      let ctx = off.getContext('2d');
-      ctx.translate(W, 0);
       const k = H / 512, rnd = U.rng(p.seed), STEPS = 10;
       const mask = p.output === 'mask';
       const cRoot = U.hex(p.root), cTip = U.hex(p.tip), cDry = U.hex(p.dry), cHead = U.hex(p.headColor);
@@ -119,14 +116,16 @@
         }
         const hShape = 1 - p.tuftShape * Math.abs(off) * 0.8;
         const kind = r[4] < p.flowers ? 'flower' : r[4] < p.flowers + p.heads ? 'head' : r[5] < p.leaves ? 'leaf' : 'blade';
-        plants.push({ u, off, z: r[6], h: (hmin + (hmax - hmin) * Math.pow(r[7], 0.8)) * hShape, kind, sub: U.rng(p.seed * 7919 + i) });
+        plants.push({ u, off, z: r[6], h: (hmin + (hmax - hmin) * Math.pow(r[7], 0.8)) * hShape, kind, s: Array.from({ length: 8 }, U.rng(p.seed * 7919 + i)) });
       }
       plants.sort((a, b) => a.z - b.z); // back first
 
-      const draw = (fn) => { ctx.save(); fn(); ctx.restore(); };
-
+      /* pass 1: geometry of every plant + the bounding box of all of it. Blades may grow far above the
+         card (heights > 1); the box is measured from the geometry, so nothing is clipped before fitting. */
+      let bx0 = Infinity, bx1 = -Infinity, by0 = Infinity;
+      const grow = (x, y, r) => { if (x - r < bx0) bx0 = x - r; if (x + r > bx1) bx1 = x + r; if (y - r < by0) by0 = y - r; };
       for (const pl of plants) {
-        const sub = pl.sub, s = Array.from({ length: 8 }, sub);
+        const s = pl.s;
         const x = pl.u * W, y = baseY + H * p.rootJitter * (1 - pl.z) * s[0] + 2 * k;
         const deg = p.lean + pl.off * p.fan + (s[1] - 0.5) * 2 * p.leanVar;
         const heading = -Math.PI / 2 + (deg * Math.PI) / 180;
@@ -134,8 +133,6 @@
         const stem = pl.kind === 'head' || pl.kind === 'flower';
         const curl = side * p.bend * (stem ? 0.35 : 0.4 + 0.6 * s[2]);
         const len = pl.h * H * (0.8 + 0.2 * pl.z);
-
-        // centerline
         const pts = [[x, y]], step = len / STEPS;
         let cx = x, cy = y;
         for (let i = 1; i <= STEPS; i++) {
@@ -154,7 +151,24 @@
           left.push([pts[i][0] - (ty / tl) * hw, pts[i][1] + (tx / tl) * hw]);
           right.push([pts[i][0] + (ty / tl) * hw, pts[i][1] - (tx / tl) * hw]);
           mid.push(pts[i]);
+          grow(pts[i][0], pts[i][1], hw + 1);
         }
+        const tip = pts[STEPS];
+        if (pl.kind === 'head') grow(tip[0], tip[1], p.headLen * H * 0.3 + Math.max(1, w * 2.2) * 2);
+        if (pl.kind === 'flower') grow(tip[0], tip[1], p.flowerSize * k * 1.3);
+        Object.assign(pl, { pts, left, right, mid, w, side, stem });
+      }
+
+      // pass 2: draw onto a canvas that covers the box (down to the card bottom)
+      const ox = Math.floor(bx0), oy = Math.floor(Math.min(by0, 0));
+      const PW = Math.max(1, Math.ceil(bx1) - ox), PH = Math.max(1, H - oy);
+      const offC = U.canvas(PW, PH);
+      let ctx = offC.getContext('2d');
+      ctx.translate(-ox, -oy);
+      const draw = (fn) => { ctx.save(); fn(); ctx.restore(); };
+
+      for (const pl of plants) {
+        const { s, pts, left, right, mid, w, side, stem } = pl;
         const ribbon = left.concat(right.slice().reverse());
 
         // colors
@@ -170,7 +184,6 @@
           g.addColorStop(1, css(tipC, shade * (1 + p.tipGlow * 0.45)));
           fill = g;
         }
-
         draw(() => {
           ctx.fillStyle = fill;
           ctx.beginPath();
@@ -214,24 +227,15 @@
         });
       }
 
-      // fit: horizontal extent of everything drawn, scaled (uniformly, roots on the ground) into the margins
-      const PW = W * 3, od = ctx.getImageData(0, 0, PW, H).data;
-      let bx0 = PW, bx1 = -1, by0 = H;
-      for (let y = 0; y < H; y++) {
-        for (let x = 0; x < PW; x++) {
-          if (od[(y * PW + x) * 4 + 3] < 4) continue;
-          if (x < bx0) bx0 = x;
-          if (x > bx1) bx1 = x;
-          if (y < by0) by0 = y;
-        }
-      }
+      // fit: the plant's box scaled (uniformly, roots on the ground) into the side margins and the card height
       ctx = out;
       if (mask) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); }
       else if (p.output === 'bg') { ctx.fillStyle = p.bg; ctx.fillRect(0, 0, W, H); }
-      if (bx1 >= bx0) {
-        const bw = bx1 - bx0 + 1, room = W * (1 - 2 * p.margin) - 2;
-        const s = Math.min(1, room / bw, (H * 0.99) / Math.max(1, H - by0));
-        ctx.drawImage(off, bx0, 0, bw, H, W / 2 - (bw * s) / 2, H - H * s, bw * s, H * s);
+      if (bx1 > bx0) {
+        const room = W * (1 - 2 * p.margin) - 2, cxBox = (bx0 + bx1) / 2;
+        const fx = Math.min(1, room / (bx1 - bx0)), fy = Math.min(1, (H * 0.99) / Math.max(1, H - by0));
+        const sx = p.fit === 'uniform' ? Math.min(fx, fy) : fx, sy = p.fit === 'uniform' ? sx : fy;
+        ctx.drawImage(offC, W / 2 + (ox - cxBox) * sx, H - (H - oy) * sy, PW * sx, PH * sy);
       }
 
       if (p.fade > 0 && p.output !== 'bg') {

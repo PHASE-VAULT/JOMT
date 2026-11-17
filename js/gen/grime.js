@@ -23,6 +23,13 @@
       { key: 'mottle', label: 'Mottling', type: 'range', min: 0, max: 1, step: 0.01, default: 0.45 },
       { key: 'speckles', label: 'Speckles', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5 },
       { key: 'streaks', label: 'Drip streaks', type: 'range', min: 0, max: 1, step: 0.01, default: 0.35 },
+      { type: 'section', label: 'Vignette', active: (p) => p.vignette > 0 },
+      { key: 'vignette', label: 'Clean center', type: 'range', min: 0, max: 1, step: 0.01, default: 0, tip: 'Keeps the center grunge-free (1 = completely clean), so the grime only frames the edges. Breaks seamless tiling' },
+      { key: 'vigSize', label: 'Clean area size', type: 'range', min: 0, max: 1, step: 0.01, default: 0.35, show: (p) => p.vignette > 0, tip: 'How far the clean area reaches out from the center' },
+      { key: 'vigSoft', label: 'Softness', type: 'range', min: 0.02, max: 1, step: 0.01, default: 0.4, show: (p) => p.vignette > 0 },
+      { key: 'vigShape', label: 'Shape', type: 'select', default: 'ellipse', options: [['ellipse', 'Ellipse (fits aspect)'], ['circle', 'Circle'], ['rect', 'Rectangle (edges)']], show: (p) => p.vignette > 0 },
+      { key: 'vigBreak', label: 'Edge breakup', type: 'range', min: 0, max: 1, step: 0.01, default: 0.4, show: (p) => p.vignette > 0, tip: 'Noise along the border of the clean area' },
+      { key: 'vigInvert', label: 'Invert (grunge in the center)', type: 'bool', default: false, show: (p) => p.vignette > 0 },
       { type: 'section', label: 'Output' },
       { key: 'mode', label: 'Output', type: 'select', default: 'overlay', options: [['overlay', 'Overlay (transparent)'], ['mask', 'Grayscale mask'], ['color', 'Dirt over base color']] },
       { key: 'dirt', label: 'Dirt color', type: 'color', default: '#2b2116', show: (p) => p.mode !== 'mask' },
@@ -40,6 +47,7 @@
       { name: 'Rust bleed', group: 'Realistic', values: { scale: 4, contrast: 2.2, stains: 0.3, mottle: 0.25, speckles: 0.15, streaks: 1, mode: 'color', dirt: '#7c3a14', base: '#b9b5ad' } },
       { name: 'Mud splash', group: 'Realistic', values: { scale: 1, contrast: 2, stains: 0.5, mottle: 0.3, speckles: 1, streaks: 0, mode: 'color', dirt: '#3c2b18', base: '#a8a294' } },
       { name: 'Limescale', group: 'Realistic', values: { amount: 0.75, scale: 5, stains: 0.55, mottle: 0.6, speckles: 0.35, streaks: 0.3, mode: 'color', dirt: '#e2dfd6', base: '#4e555c' } },
+      { name: 'Grunge frame (clean center)', group: 'Realistic', values: { amount: 1.2, contrast: 1.8, stains: 0.8, mottle: 0.5, speckles: 0.6, streaks: 0.3, vignette: 1, vigSize: 0.3, vigSoft: 0.45, vigBreak: 0.5 } },
       { name: 'Dirt mask (fine)', group: 'Realistic', values: { amount: 1, scale: 8, contrast: 1.2, stains: 0.4, mottle: 0.8, speckles: 0.6, streaks: 0, mode: 'mask' } },
       { name: 'Toon dirt', group: 'Stylized', values: { amount: 1, scale: 2, contrast: 4, stains: 0.8, mottle: 0, speckles: 0.6, streaks: 0, mode: 'color', dirt: '#6c4a2a', base: '#cdb88c' } },
       { name: 'Painterly grunge', group: 'Stylized', values: { amount: 1.2, scale: 2, contrast: 1.2, stains: 0.9, mottle: 0.8, speckles: 0.2, streaks: 0, mode: 'color', dirt: '#8a5a3a', base: '#e4cca4' } },
@@ -79,6 +87,17 @@
           g = U.screen(g, U.smoothstep(0.62, 0.92, s) * U.smoothstep(0.38, 0.62, gate) * p.streaks);
         }
         g = U.clamp(g * p.amount);
+        if (p.vignette > 0) {
+          // grunge-free center: 0 at the center, 1 at the corners (ellipse / circle) or at the edges (rectangle),
+          // with a noise-broken transition so the clean area has an organic outline
+          const cx = u * 2 - 1, cy = v * 2 - 1;
+          let r = p.vigShape === 'rect' ? Math.max(Math.abs(cx), Math.abs(cy))
+            : p.vigShape === 'circle' ? Math.hypot((u - 0.5) * W, (v - 0.5) * H) / (Math.hypot(W, H) / 2)
+            : Math.hypot(cx, cy) / Math.SQRT2;
+          if (p.vigBreak > 0) r += (U.fractal('perlin', u * sx * 2, v * sy * 2, sx * 2, sy * 2, 3, 0.5, 'fbm', seed + 17) - 0.5) * p.vigBreak * 0.5;
+          const m = U.smoothstep(p.vigSize, p.vigSize + p.vigSoft, r);
+          g *= p.vigInvert ? 1 - p.vignette * m : 1 - p.vignette * (1 - m);
+        }
         if (p.mode === 'mask') { const vv = (p.invert ? 1 - g : g) * 255; o[0] = o[1] = o[2] = vv; }
         else if (p.mode === 'overlay') { o[0] = dc[0]; o[1] = dc[1]; o[2] = dc[2]; o[3] = g * 255; }
         else { o[0] = bc[0] + (dc[0] - bc[0]) * g; o[1] = bc[1] + (dc[1] - bc[1]) * g; o[2] = bc[2] + (dc[2] - bc[2]) * g; }

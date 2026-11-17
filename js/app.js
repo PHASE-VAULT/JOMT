@@ -393,16 +393,18 @@
     markDirty(cur());
     if (rebuild) buildPanel();
     else if (refreshVis) refreshVis();
+    syncExportLabel();
     scheduleRender(true);
     save();
   }
 
   /* ---------- rendering ---------- */
-  function renderTab(tab, W, H, preview) {
+  // `layer`: one layer of a separate-layer export (generators with `exportLayers`), else the full image
+  function renderTab(tab, W, H, preview, layer) {
     const gen = U.getGen(tab.type);
     if (sheetOn(tab)) return U.renderSheet(gen, tab.params, tab.sheet, W, H, { preview });
     const c = U.canvas(W, H);
-    const info = gen.render(c.getContext('2d'), W, H, tab.params, { preview }) || {};
+    const info = gen.render(c.getContext('2d'), W, H, tab.params, { preview, layer }) || {};
     if (normalOn(tab)) {
       // generators with `heightMap: true` render their own height map (e.g. impact decals without the smoke stain);
       // all others use the texture itself as height
@@ -420,9 +422,9 @@
 
   /* render at the requested size; for small pixel-art exports, supersample and resolve each output
      pixel to one real color with hard alpha (no anti-aliased edges) */
-  function renderOutput(tab, W, H, preview) {
-    if (!pixelExport() || W > PIXEL_MAX || H > PIXEL_MAX) return renderTab(tab, W, H, preview);
-    const f = HARD_FACTOR, big = renderTab(tab, W * f, H * f, preview);
+  function renderOutput(tab, W, H, preview, layer) {
+    if (!pixelExport() || W > PIXEL_MAX || H > PIXEL_MAX) return renderTab(tab, W, H, preview, layer);
+    const f = HARD_FACTOR, big = renderTab(tab, W * f, H * f, preview, layer);
     const sd = big.canvas.getContext('2d').getImageData(0, 0, W * f, H * f).data, BW = W * f;
     const out = U.canvas(W, H), oc = out.getContext('2d'), img = oc.createImageData(W, H), d = img.data;
     const votes = new Map();
@@ -606,7 +608,14 @@
     $('#hardRow').hidden = S.exportSize > PIXEL_MAX;
     $('#hardPixels').checked = S.hardPixels;
     $('#format').value = S.format;
-    $('#exportBtn').textContent = U.t('Download {0}', FORMATS[S.format][2]);
+    syncExportLabel();
+  }
+
+  // a separate-layer export downloads several files: say so on the button
+  function syncExportLabel() {
+    const l = exportLayersOf(cur());
+    $('#exportBtn').textContent = l ? U.t('Download {0} × {1}', l.length, FORMATS[S.format][2]) : U.t('Download {0}', FORMATS[S.format][2]);
+    $('#exportBtn').title = (l ? U.t('Separate layers: {0}', l.map((x) => x.suffix).join(', ')) + ' · ' : '') + 'Ctrl+S';
   }
 
   function buildChrome() {
@@ -977,39 +986,55 @@
   /* ---------- export ---------- */
   function safeName(s) { return s.replace(/[^\p{L}\p{N}_\- ]+/gu, '').trim().replace(/\s+/g, '_') || 'texture'; }
 
+  /* separate-layer export: generators with `exportLayers(params)` -> [{ id, suffix }] (or null for one image) */
+  function exportLayersOf(tab) {
+    const gen = tab && U.getGen(tab.type);
+    if (!gen || !gen.exportLayers || normalOn(tab) || sheetOn(tab)) return null;
+    const l = gen.exportLayers(tab.params);
+    return l && l.length ? l : null;
+  }
+
   async function doExport(copy) {
     const tab = cur();
     if (!tab) return false;
     const [W, H] = dims(aspectOf(tab), S.exportSize);
+    // the clipboard holds one image: Copy always takes the combined image
+    const layers = (!copy && exportLayersOf(tab)) || [null];
     showBusy(U.t('Rendering {0}…', `${W} × ${H}`));
     await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 20)));
     try {
-      let { canvas } = renderOutput(tab, W, H, false);
       const fmt = copy ? FORMATS.png : FORMATS[S.format];
-      if (fmt[0] === 'image/jpeg') {
-        // JPEG has no alpha: flatten onto black
-        const flat = U.canvas(W, H), g = flat.getContext('2d');
-        g.fillStyle = '#000';
-        g.fillRect(0, 0, W, H);
-        g.drawImage(canvas, 0, 0);
-        canvas = flat;
-      }
-      const blob = await new Promise((r) => canvas.toBlob(r, fmt[0], 0.95));
-      if (!blob) throw new Error(U.t('the browser could not encode an image this large'));
-      if (copy) {
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-        toast(U.t(normalOn(tab) ? 'Copied {0} normal map PNG to clipboard' : 'Copied {0} PNG to clipboard', `${W}×${H}`));
-      } else {
+      const names = [];
+      for (const layer of layers) {
+        let { canvas } = renderOutput(tab, W, H, false, layer ? layer.id : undefined);
+        if (fmt[0] === 'image/jpeg') {
+          // JPEG has no alpha: flatten onto black
+          const flat = U.canvas(W, H), g = flat.getContext('2d');
+          g.fillStyle = '#000';
+          g.fillRect(0, 0, W, H);
+          g.drawImage(canvas, 0, 0);
+          canvas = flat;
+        }
+        const blob = await new Promise((r) => canvas.toBlob(r, fmt[0], 0.95));
+        if (!blob) throw new Error(U.t('the browser could not encode an image this large'));
+        if (copy) {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          toast(U.t(normalOn(tab) ? 'Copied {0} normal map PNG to clipboard' : 'Copied {0} PNG to clipboard', `${W}×${H}`));
+          continue;
+        }
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        const suffix = normalOn(tab) ? '_normal' : sheetOn(tab) ? `_sheet${tab.sheet.grid}x${tab.sheet.grid}` : '';
+        const suffix = normalOn(tab) ? '_normal' : sheetOn(tab) ? `_sheet${tab.sheet.grid}x${tab.sheet.grid}` : layer ? '_' + layer.suffix : '';
         a.download = `${safeName(tabName(tab))}${suffix}_${W}x${H}.${fmt[1]}`;
         document.body.append(a);
         a.click();
         a.remove();
         setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-        toast(U.t('Exported {0}', a.download));
+        names.push(a.download);
+        // browsers may drop rapid successive downloads: give each one a moment
+        if (layers.length > 1) await new Promise((r) => setTimeout(r, 250));
       }
+      if (names.length) toast(names.length > 1 ? U.t('Exported {0} layers: {1}', names.length, names.join(', ')) : U.t('Exported {0}', names[0]));
       tab.dirty = false;
       renderTabs();
       save();

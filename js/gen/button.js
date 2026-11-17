@@ -64,6 +64,8 @@
       { key: 'glow', label: 'Glow', type: 'range', min: 0, max: 1, step: 0.01, default: 0 },
       { key: 'glowSize', label: 'Glow size', type: 'range', min: 1, max: 60, step: 0.5, default: 16, show: (p) => p.glow > 0 },
       { key: 'glowColor', label: 'Glow color', type: 'color', default: '#5fe3b0', show: (p) => p.glow > 0 },
+      ...U.wearParams(),
+      { key: 'seed', label: 'Seed', type: 'seed', default: 7 },
     ],
     presets: [
       // Tarkov-style: dark slate gray, flat with a 1 px light inner rim, square corners
@@ -100,6 +102,13 @@
       { name: 'Holo glass', group: 'Sci-fi', values: { margin: 14, radius: 0.25, top: '#8fe8ff', bottom: '#3a8aff', fillAlpha: 0.28, outlineW: 1.5, outlineColor: '#bff4ff', bevel: 0, topLine: 0.5, gloss: 0.25, glow: 0.5, glowSize: 12, glowColor: '#40b0ff', shadowAlpha: 0 } },
       { name: 'Hazard stripes', group: 'Sci-fi', values: { corner: 'chamfer', radius: 0.25, fillMode: 'solid', top: '#f2b705', outlineW: 2, outlineColor: '#111111', stripes: 0.5, stripeSize: 18, bevel: 3, bevelLight: 0.2, bevelDark: 0.3, topLine: 0, shadowY: 3, shadowBlur: 3, shadowAlpha: 0.5 } },
       { name: 'Reactor red alert', group: 'Sci-fi', values: { margin: 14, corner: 'chamfer', radius: 0.4, top: '#3a0a0e', bottom: '#1a0306', outlineW: 2, outlineColor: '#ff3b4a', innerW: 1, innerInset: 6, innerColor: '#ff3b4a', innerAlpha: 0.4, bevel: 0, glow: 0.6, glowSize: 14, glowColor: '#ff2030', shadowAlpha: 0 } },
+      // Post-apocalyptic: rust, scrap, dirt and wear
+      { name: 'Wasteland scrap metal', group: 'Post-apocalyptic', values: { corner: 'chamfer', radius: 0.2, top: '#6a5a48', bottom: '#3a3026', outlineW: 2, outlineColor: '#1a140e', bevel: 3, bevelLight: 0.2, bevelDark: 0.4, topLine: 0, colorNoise: 0.5, noiseColor: '#7a3e18', noiseScale: 4, brightNoise: 0.15, grunge: 0.18, grungeType: 'chipped', grungeScale: 6, edgeWear: 0.3, dirt: 0.45, dirtColor: '#20160c', scratches: 0.3, seed: 13 } },
+      { name: 'Rusted warning button', group: 'Post-apocalyptic', values: { corner: 'square', top: '#9a3a22', bottom: '#5a1e10', outlineW: 2, outlineColor: '#1c0c06', stripes: 0.3, stripeSize: 14, bevel: 2, topLine: 0, colorNoise: 0.45, noiseColor: '#4a2410', brightNoise: 0.12, grunge: 0.2, grungeType: 'blotchy', grungeScale: 5, edgeWear: 0.3, dirt: 0.4, scratches: 0.25, seed: 21 } },
+      { name: 'Bunker terminal key', group: 'Post-apocalyptic', values: { corner: 'square', top: '#2a3020', bottom: '#181c12', outlineW: 1.5, outlineColor: '#5a6a3a', innerW: 1, innerInset: 4, innerColor: '#9ab06a', innerAlpha: 0.4, bevel: 0, topLine: 0, glow: 0.25, glowSize: 10, glowColor: '#9ae05a', brightNoise: 0.12, noiseType: 'value', noiseScale: 14, grunge: 0.15, grungeType: 'speckle', grungeScale: 14, dirt: 0.3, scratches: 0.25, seed: 4 } },
+      { name: 'Cardboard sign', group: 'Post-apocalyptic', values: { corner: 'square', fillMode: 'solid', top: '#b8925a', outlineW: 0, bevel: 0, topLine: 0, gloss: 0, shadowAlpha: 0.4, distort: 0.25, distortScale: 3, colorNoise: 0.3, noiseColor: '#7a5a2a', grunge: 0.2, grungeType: 'blotchy', edgeWear: 0.7, edgeWidth: 5, dirt: 0.4, dirtColor: '#4a3418', seed: 8 } },
+      { name: 'Scavenger button (rusted)', group: 'Post-apocalyptic', values: { corner: 'chamfer', radius: 0.15, fillMode: 'gradient', top: '#b8432a', bottom: '#6a1e10', outlineW: 4, outlineColor: '#1c120c', bevel: 0, topLine: 0, gloss: 0, shadowAlpha: 0.45, colorNoise: 0.45, noiseColor: '#5a3a1a', noiseScale: 4, brightNoise: 0.15, distort: 0.06, grunge: 0.3, grungeType: 'chipped', grungeScale: 6, edgeWear: 0.6, dirt: 0.4, dirtColor: '#2a1a0c', scratches: 0.4, seed: 31, grungeScale: 2.5, grunge: 0.26, scratches: 0.18, edgeWidth: 4 } },
+      { name: 'Scavenger button (dark)', group: 'Post-apocalyptic', values: { corner: 'square', fillMode: 'gradient', top: '#2e2722', bottom: '#1a1512', outlineW: 4, outlineColor: '#0e0a07', bevel: 0, topLine: 0, gloss: 0, shadowAlpha: 0.45, colorNoise: 0.45, noiseColor: '#5a3a1a', noiseScale: 4, brightNoise: 0.15, distort: 0.06, grunge: 0.3, grungeType: 'chipped', grungeScale: 6, edgeWear: 0.6, dirt: 0.4, dirtColor: '#2a1a0c', scratches: 0.4, colorNoise: 0.3, seed: 44, grungeScale: 2.5, grunge: 0.26, scratches: 0.18, edgeWidth: 4 } },
     ],
     render(ctx, W, H, p) {
       const S = Math.min(W, H), k = S / 128, m = p.margin * k;
@@ -110,15 +119,19 @@
       if (w <= 2 || h <= 2) return;
       const r = p.radius * h;
 
-      const L = U.canvas(W, H), c = L.getContext('2d');
+      const L = U.canvas(W, H);
+      let c = L.getContext('2d');
       const body = () => bodyPath(c, x, y, w, h, p.corner, r);
 
-      // glow and drop shadow (cast by the filled body)
-      const shadowFill = (color, blur, oy) => { c.save(); c.shadowColor = color; c.shadowBlur = blur; c.shadowOffsetY = oy; c.fillStyle = '#000'; c.globalCompositeOperation = 'source-over'; body(); c.fill(); c.restore(); };
-      if (p.glow > 0) { shadowFill(rgbaOf(p.glowColor, p.glow), p.glowSize * k, 0); }
-      if (p.shadowAlpha > 0) shadowFill(`rgba(0,0,0,${p.shadowAlpha})`, p.shadowBlur * k, sy * k);
-      // remove the black bodies used to cast the shadows (only their shadows should stay)
-      c.save(); c.globalCompositeOperation = 'destination-out'; body(); c.fill(); c.restore();
+      // silhouette: the solid body + outlines; it casts the glow and drop shadow (also for see-through fills)
+      // and gives edge wear the real outline
+      const Sil = U.canvas(W, H);
+      c = Sil.getContext('2d');
+      c.lineJoin = p.corner === 'round' ? 'round' : 'miter';
+      body(); c.fillStyle = '#000'; c.fill();
+      const ow = p.outlineW + (p.outer > 0 ? p.outer : 0);
+      if (ow > 0) { body(); c.lineWidth = ow * 2 * k; c.strokeStyle = '#000'; c.stroke(); }
+      c = L.getContext('2d');
 
       // outlines (stroked around the edge, the fill covers their inner half)
       c.lineJoin = p.corner === 'round' ? 'round' : 'miter';
@@ -174,9 +187,27 @@
         c.lineWidth = p.innerW * k; c.strokeStyle = rgbaOf(p.innerColor, p.innerAlpha, hover ? 1.15 : 1); c.stroke();
       }
 
+      // wear (noise, grunge, distortion): the body and its silhouette get the same fields, so the shadow
+      // follows the worn / distorted shape
+      let B = L, Sh = Sil;
+      if (U.wearActive(p)) {
+        const F = U.wearFields(W, H, p, S, Sil);
+        U.wearScratches(L.getContext('2d'), W, H, p, S);
+        B = U.imageCanvas(U.wearApply(L, p, F));
+        Sh = U.imageCanvas(U.wearApply(Sil, p, F, { color: false }));
+      }
+      // glow + drop shadow: draw the silhouette far off-canvas and shift only its shadow back in
+      const C = U.canvas(W, H), cc = C.getContext('2d'), far = W * 4;
+      const cast = (color, blur, oy) => { cc.save(); cc.shadowColor = color; cc.shadowBlur = blur; cc.shadowOffsetX = far; cc.shadowOffsetY = oy; cc.drawImage(Sh, -far, 0); cc.restore(); };
+      if (p.glow > 0) cast(rgbaOf(p.glowColor, p.glow), p.glowSize * k, 0);
+      if (p.shadowAlpha > 0) cast(`rgba(0,0,0,${p.shadowAlpha})`, p.shadowBlur * k, sy * k);
+      // the shadows sit under the body only: cut the silhouette out (see-through fills don't show their own shadow)
+      cc.save(); cc.globalCompositeOperation = 'destination-out'; cc.drawImage(Sh, 0, 0); cc.restore();
+      cc.drawImage(B, 0, 0);
+
       // disabled: washed out and see-through
-      if (disabled) { ctx.save(); if ('filter' in ctx) ctx.filter = 'grayscale(0.85)'; ctx.globalAlpha = 0.5; ctx.drawImage(L, 0, 0); ctx.restore(); }
-      else ctx.drawImage(L, 0, 0);
+      if (disabled) { ctx.save(); if ('filter' in ctx) ctx.filter = 'grayscale(0.85)'; ctx.globalAlpha = 0.5; ctx.drawImage(C, 0, 0); ctx.restore(); }
+      else ctx.drawImage(C, 0, 0);
     },
   });
 })();

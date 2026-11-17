@@ -2,7 +2,8 @@
      1. smoke / dust grunge   – noisy soot or dust around the hit (color only, never in the normal map)
      2. surrounding material  – a soft gradient bulge of the surface pushed up around the hit
      3. bent-out material     – noise-based torn petals curling up around the hole; the main color / material
-     4. hole                  – the dark center
+     4. hole                  – an inner wall of material at the edge, shading down into the dark center
+   Everything fades out towards the texture edge, so a large impact never shows a hard cut.
    Shapes come from angular noise (hole edge, petal reach, surround reach). Every pixel gets a height; the
    petals and the surround are lit from that height field, and normal map mode uses the same field (without
    the smoke), so color and normals always match. Transparent output, no background. */
@@ -11,7 +12,7 @@
   const U = window.UGTG;
   const TAU = Math.PI * 2, D2R = Math.PI / 180;
   const LN = 1024; // angular resolution of the shape lookup tables
-  const LIGHT = (() => { const l = [-0.55, -0.6, 0.58], m = Math.hypot(...l); return l.map((v) => v / m); })();
+  const LIGHT = [0, 0, 1]; // frontal: the light comes from the viewer, so only the steepness of a slope shades it (no side bias)
 
   U.register({
     id: 'impact',
@@ -29,11 +30,13 @@
       { key: 'holeSize', label: 'Hole size', type: 'range', min: 0.01, max: 0.15, step: 0.001, default: 0.055, tip: 'Hole radius as a fraction of the texture; every layer scales with it' },
       { key: 'roundness', label: 'Roundness', type: 'range', min: 0, max: 1, step: 0.01, default: 0, tip: 'Global perfectness: smooths away the irregular hole edge, the tears between the flaps, the uneven flap reach, the surface noise and the bulge outline. 1 = a perfectly round impact' },
       { key: 'holeIrregular', label: 'Irregularity', type: 'range', min: 0, max: 1, step: 0.01, default: 0.35 },
-      { key: 'holeSoft', label: 'Inner depth gradient', type: 'range', min: 0, max: 1, step: 0.01, default: 0.35, tip: 'How far the hole lightens towards its edge (0 = flat black)' },
-      { key: 'holeColor', label: 'Hole color', type: 'color', default: '#000000' },
+      { key: 'holeWall', label: 'Inner wall', type: 'range', min: 0, max: 1, step: 0.01, default: 0.4, tip: 'Width of the visible material band just inside the hole edge, lit from the front, before it goes deep' },
+      { key: 'holeSoft', label: 'Inner depth gradient', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, tip: 'How far the hole lightens towards its edge (0 = flat black)' },
+      { key: 'holeColor', label: 'Hole color', type: 'color', default: '#050404' },
       { key: 'stretch', label: 'Impact angle (stretch)', type: 'range', min: 1, max: 2.5, step: 0.01, default: 1, tip: '1 = straight hit; higher = a glancing hit, elongated along the direction' },
       { key: 'direction', label: 'Direction', type: 'range', min: -180, max: 180, step: 1, default: 0, show: (p) => p.stretch > 1 },
       { key: 'seed', label: 'Seed', type: 'seed', default: 7 },
+      { key: 'edgeFade', label: 'Edge fade', type: 'range', min: 0, max: 0.5, step: 0.01, default: 0.15, tip: 'Everything fades out over this distance towards the texture edge, so a large impact has no hard cut (fraction of half the texture)' },
 
       { type: 'section', label: 'Bent material' },
       { key: 'petalSize', label: 'Reach', type: 'range', min: 1.1, max: 5, step: 0.05, default: 2.1, tip: 'How far the torn material bends out (× hole size)' },
@@ -45,7 +48,7 @@
       { key: 'grainAngle', label: 'Grain direction', type: 'range', min: -90, max: 90, step: 1, default: 0, show: (p) => p.anisotropy > 0 },
       { key: 'petalColor', label: 'Color', type: 'color', default: '#a9aaa6' },
       { key: 'petalColor2', label: 'Color variation', type: 'color', default: '#7c7d79', tip: 'Mixed in by the surface noise' },
-      { key: 'shade', label: 'Shading', type: 'range', min: 0, max: 1, step: 0.01, default: 0.8, tip: 'Lighting from the height field (light from the top left)' },
+      { key: 'shade', label: 'Shading', type: 'range', min: 0, max: 1, step: 0.01, default: 0.8, tip: 'Lighting from the height field (light from the front, from the viewer)' },
 
       { type: 'section', label: 'Surrounding material' },
       { key: 'surroundSize', label: 'Reach', type: 'range', min: 1.5, max: 10, step: 0.1, default: 3.6, tip: '× hole size' },
@@ -73,6 +76,9 @@
       { name: 'Brick', group: 'Stone', values: { petalColor: '#c48462', petalColor2: '#8a4a32', petals: 14, jag: 0.4, petalSize: 2.3, petalNoise: 0.9, noiseScale: 16, surroundColor: '#9a5a3c', surroundAlpha: 0.5, surroundBulge: 0.2, smokeColor: '#d8b49a', smokeAlpha: 0.4, grunge: 0.8 } },
       { name: 'Plaster / drywall', group: 'Stone', values: { petalColor: '#f0ede6', petalColor2: '#c9c4ba', petals: 10, jag: 0.35, petalSize: 2.2, petalNoise: 0.6, surroundColor: '#e2ddd2', surroundAlpha: 0.5, surroundBulge: 0.25, smokeColor: '#3a3632', smokeAlpha: 0.4 } },
       { name: 'Rubber / tire', group: 'Other', values: { petalColor: '#2c2c2c', petalColor2: '#1a1a1a', petals: 5, jag: 0.25, petalSize: 1.6, petalNoise: 0.2, surroundColor: '#242424', surroundAlpha: 0.6, smokeAlpha: 0.3 } },
+      { name: 'Flesh', group: 'Organic', values: { holeSize: 0.05, holeIrregular: 0.6, holeWall: 0.55, holeSoft: 0.6, holeColor: '#140202', petalSize: 1.7, petals: 11, jag: 0.35, petalNoise: 0.8, noiseScale: 12, petalColor: '#962a22', petalColor2: '#560b09', shade: 0.55, surroundSize: 3.2, surroundAlpha: 0.85, surroundBulge: 0.45, surroundColor: '#6a1410', smokeSize: 5.5, smokeAlpha: 0.7, grunge: 0.85, grungeScale: 22, smokeColor: '#7a0806' } },
+      { name: 'Flesh (heavy bleeding)', group: 'Organic', values: { holeSize: 0.06, holeIrregular: 0.7, holeWall: 0.6, holeSoft: 0.55, holeColor: '#0e0101', petalSize: 1.9, petals: 13, jag: 0.45, petalNoise: 0.9, noiseScale: 10, petalColor: '#841c17', petalColor2: '#420504', shade: 0.5, surroundSize: 4.2, surroundAlpha: 0.95, surroundBulge: 0.35, surroundColor: '#5e0806', smokeSize: 8, smokeAlpha: 0.85, grunge: 0.9, grungeScale: 18, smokeColor: '#5a0303' } },
+      { name: 'Flesh (pale skin)', group: 'Organic', values: { holeSize: 0.04, holeIrregular: 0.45, holeWall: 0.5, holeSoft: 0.6, holeColor: '#1a0303', petalSize: 1.5, petals: 9, jag: 0.25, petalNoise: 0.6, noiseScale: 14, petalColor: '#b04a40', petalColor2: '#7a1a14', shade: 0.5, surroundSize: 3.4, surroundAlpha: 0.7, surroundBulge: 0.5, surroundColor: '#d9998a', smokeSize: 4.5, smokeAlpha: 0.55, grunge: 0.8, grungeScale: 26, smokeColor: '#8c0c08' } },
       { name: 'No smoke', group: 'Other', values: { smoke: false } },
       { name: 'Glancing hit', group: 'Other', values: { stretch: 1.9, direction: -20, petals: 5 } },
     ],
@@ -113,7 +119,7 @@
       /* ---------- pass 1: height field + layer coverages ---------- */
       const N = bw * bh;
       const Hm = new Float32Array(N).fill(0.5), wHole = new Float32Array(N), wPetal = new Float32Array(N);
-      const wSur = new Float32Array(N), aSmoke = new Float32Array(N), nv = new Float32Array(N), hDepth = new Float32Array(N);
+      const wSur = new Float32Array(N), aSmoke = new Float32Array(N), nv = new Float32Array(N), hDepth = new Float32Array(N), hLit = new Float32Array(N);
       const ss = smoothstep, aa = 1;
       const ns = p.noiseScale / hr, ca = Math.cos(grain), sa = Math.sin(grain);
       for (let y = y0; y < y1; y++) {
@@ -150,14 +156,23 @@
           // hole
           const inH = ss(rh + aa, rh - aa, r), depth = Math.max(0, Math.min(1, r / Math.max(1e-3, rh)));
           hDepth[j] = depth;
+          // the inner wall stands across the frontal light: evenly dim all around (a little variation from the surface noise)
+          if (inH > 0) hLit[j] = 0.35 + 0.2 * (n - 0.5);
           h += (0.03 + 0.12 * Math.pow(depth, 3) - h) * inH;
           Hm[j] = h; wHole[j] = inH; wPetal[j] = inP; wSur[j] = sur;
         }
       }
 
+      // fade towards the texture edge (smooth per axis, multiplied so the corners round off)
+      const ef = Math.max(0, p.edgeFade || 0) * S * 0.5;
+      const efAt = (j) => {
+        if (ef <= 0) return 1;
+        const x = x0 + (j % bw) + 0.5, y = y0 + ((j / bw) | 0) + 0.5;
+        return ss(0, ef, Math.min(x, W - x)) * ss(0, ef, Math.min(y, H - y));
+      };
       const out = ctx.createImageData(bw, bh), d = out.data;
       if (height) {
-        for (let j = 0; j < N; j++) { const v = Math.round(Math.max(0, Math.min(1, Hm[j])) * 255); d[j * 4] = d[j * 4 + 1] = d[j * 4 + 2] = v; d[j * 4 + 3] = 255; }
+        for (let j = 0; j < N; j++) { const v = Math.round(Math.max(0, Math.min(1, 0.5 + (Hm[j] - 0.5) * efAt(j))) * 255); d[j * 4] = d[j * 4 + 1] = d[j * 4 + 2] = v; d[j * 4 + 3] = 255; }
         ctx.putImageData(out, x0, y0);
         return;
       }
@@ -177,7 +192,7 @@
           const hL = Hm[x > 0 ? j - 1 : j], hR = Hm[x < bw - 1 ? j + 1 : j], hU = Hm[y > 0 ? j - bw : j], hD = Hm[y < bh - 1 ? j + bw : j];
           const nx = -(hR - hL) * 0.5 * g, ny = -(hD - hU) * 0.5 * g, l = 1 / Math.hypot(nx, ny, 1);
           const lit = (nx * LIGHT[0] + ny * LIGHT[1] + LIGHT[2]) * l - LIGHT[2];
-          const f = Math.max(0.15, 1 + p.shade * 1.8 * lit);
+          const f = Math.max(0.15, 1 + p.shade * 3.2 * lit); // frontal light only darkens slopes, so a stronger factor keeps the relief readable
           R = G = B = A = 0;
           over(cSm[0], cSm[1], cSm[2], aSmoke[j]);
           over(cS[0] * f, cS[1] * f, cS[2] * f, wSur[j] * (1 - wPetal[j]));
@@ -185,12 +200,24 @@
             const m = Math.max(0, Math.min(1, (nv[j] - 0.3) * 1.6 * Math.min(1, petalNoise * 1.5 + 0.2 * irr)));
             over((cP1[0] + (cP2[0] - cP1[0]) * m) * f, (cP1[1] + (cP2[1] - cP1[1]) * m) * f, (cP1[2] + (cP2[2] - cP1[2]) * m) * f, wPetal[j]);
           }
-          if (wHole[j] > 0) { // dark center, lightening slightly towards the edge
-            const e = p.holeSoft * 0.35 * Math.pow(hDepth[j], 3);
-            over(cH[0] + (cP2[0] - cH[0]) * e, cH[1] + (cP2[1] - cH[1]) * e, cH[2] + (cP2[2] - cH[2]) * e, wHole[j]);
+          if (wHole[j] > 0) {
+            // depth gradient: dark center, lifting towards the edge into a dim, shaded version of the material
+            const dp = hDepth[j], e = p.holeSoft * 0.45 * Math.pow(dp, 2.2), deep = 0.22;
+            let hr2 = cH[0] + (cP2[0] * deep - cH[0]) * e, hg2 = cH[1] + (cP2[1] * deep - cH[1]) * e, hb2 = cH[2] + (cP2[2] * deep - cH[2]) * e;
+            // inner wall: a band of material just inside the rim, lit by its facing, falling off into the depth
+            const ww = p.holeWall;
+            if (ww > 0) {
+              const t = ss(1 - ww, 1, dp), wt = t * t;
+              const lf = (0.28 + 0.6 * hLit[j]) * (0.55 + 0.45 * t);
+              const m = Math.max(0, Math.min(1, (nv[j] - 0.3) * 1.6 * Math.min(1, petalNoise * 1.5 + 0.2 * irr)));
+              const k = 0.35 * (1 - m);
+              const wr = (cP2[0] + (cP1[0] - cP2[0]) * k) * lf, wg = (cP2[1] + (cP1[1] - cP2[1]) * k) * lf, wb = (cP2[2] + (cP1[2] - cP2[2]) * k) * lf;
+              hr2 += (wr - hr2) * wt; hg2 += (wg - hg2) * wt; hb2 += (wb - hb2) * wt;
+            }
+            over(hr2, hg2, hb2, wHole[j]);
           }
           const o = j * 4;
-          d[o] = Math.min(255, R); d[o + 1] = Math.min(255, G); d[o + 2] = Math.min(255, B); d[o + 3] = Math.round(A * 255);
+          d[o] = Math.min(255, R); d[o + 1] = Math.min(255, G); d[o + 2] = Math.min(255, B); d[o + 3] = Math.round(A * efAt(j) * 255);
         }
       }
       const layer = U.canvas(bw, bh);

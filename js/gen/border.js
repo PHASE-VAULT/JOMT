@@ -143,6 +143,8 @@
       { key: 'glow', label: 'Outer glow', type: 'bool', default: false },
       { key: 'glowSize', label: 'Glow size', type: 'range', min: 1, max: 64, step: 1, default: 16, show: (p) => p.glow },
       { key: 'glowColor', label: 'Glow color', type: 'color', default: '#ff8a3d', show: (p) => p.glow },
+      ...U.wearParams(),
+      { key: 'seed', label: 'Seed', type: 'seed', default: 7 },
     ],
     presets: [
       // Realistic
@@ -175,18 +177,28 @@
       { name: 'Hazard dashes', group: 'Sci-fi', values: { style: 'dashed', corner: 'chamfer', radius: 36, thickness: 14, dash: 30, gap: 18, inset: 18, color: '#ffc21a' } },
       { name: 'Terminal green dashes', group: 'Sci-fi', values: { style: 'dashed', corner: 'square', thickness: 5, dash: 12, gap: 8, inset: 16, color: '#38ff7a', glow: true, glowSize: 10, glowColor: '#00ff5a' } },
       { name: 'Data-node dots', group: 'Sci-fi', values: { style: 'dotted', corner: 'chamfer', radius: 60, thickness: 10, gap: 18, inset: 20, color: '#b98cff', glow: true, glowSize: 10, glowColor: '#8a4dff' } },
+      // Post-apocalyptic: rust, scrap, dirt and wear
+      { name: 'Rusted scrap frame', group: 'Post-apocalyptic', values: { thickness: 14, corner: 'chamfer', radius: 40, inset: 14, color: '#8a5430', colorNoise: 0.5, noiseColor: '#3a2010', brightNoise: 0.2, distort: 0.06, grunge: 0.12, grungeType: 'chipped', grungeScale: 10, dirt: 0.4, scratches: 0.15, seed: 5 } },
+      { name: 'Spray-painted frame', group: 'Post-apocalyptic', values: { thickness: 10, corner: 'square', inset: 18, color: '#d8d0c0', distort: 0.3, distortScale: 5, grunge: 0.35, grungeType: 'speckle', grungeScale: 14, brightNoise: 0.1, seed: 11 } },
+      { name: 'Torn hazard tape', group: 'Post-apocalyptic', values: { style: 'dashed', corner: 'square', thickness: 20, dash: 34, gap: 18, inset: 16, color: '#e0b020', grunge: 0.12, grungeType: 'chipped', grungeScale: 9, dirt: 0.5, dirtColor: '#2a1c0c', scratches: 0.15, seed: 3 } },
+      { name: 'Bunker stencil frame', group: 'Post-apocalyptic', values: { style: 'double', thickness: 5, dgap: 6, corner: 'chamfer', radius: 30, inset: 14, color: '#a8b088', grunge: 0.25, grungeType: 'blotchy', grungeScale: 6, dirt: 0.3, scratches: 0.3, seed: 9 } },
+      { name: 'Scavenger frame (dark fill)', group: 'Post-apocalyptic', values: { thickness: 36, corner: 'square', inset: 16, color: '#2a1c12', fill: true, fillColor: '#1c1612', colorNoise: 0.45, noiseColor: '#5a3a1a', noiseScale: 4, brightNoise: 0.15, distort: 0.06, grunge: 0.3, grungeType: 'chipped', grungeScale: 6, edgeWear: 0.6, dirt: 0.4, dirtColor: '#2a1a0c', scratches: 0.4, colorNoise: 0.3, noiseColor: '#4a2a14', seed: 31, grungeScale: 4, scratches: 0.2 } },
+      { name: 'Scavenger rust frame', group: 'Post-apocalyptic', values: { thickness: 44, corner: 'chamfer', radius: 40, inset: 16, color: '#7a3e1e', colorNoise: 0.45, noiseColor: '#5a3a1a', noiseScale: 4, brightNoise: 0.15, distort: 0.06, grunge: 0.3, grungeType: 'chipped', grungeScale: 6, edgeWear: 0.6, dirt: 0.4, dirtColor: '#2a1a0c', scratches: 0.4, seed: 12 } },
     ],
     render(ctx, W, H, p) {
       const k = Math.min(W, H) / 512, t = p.thickness * k, ins = p.inset * k;
       const R = p.corner === 'square' ? 0 : p.radius * k;
       const at = (o) => [ins + o, ins + o, W - 2 * (ins + o), H - 2 * (ins + o), Math.max(0, R - o)];
 
+      // fill and lines go on their own layers: both can be worn (noise / grunge / distortion), and the glow is
+      // cast afterwards by the (worn) lines only
+      const out = ctx, FC = U.canvas(W, H), LC = U.canvas(W, H);
       if (p.fill) {
-        const [x, y, w, h, r] = at(0);
-        if (w > 0 && h > 0) { frame(ctx, x, y, w, h, r, p.corner); ctx.fillStyle = p.fillColor; ctx.fill(); }
+        const [x, y, w, h, r] = at(0), fc = FC.getContext('2d');
+        if (w > 0 && h > 0) { frame(fc, x, y, w, h, r, p.corner); fc.fillStyle = p.fillColor; fc.fill(); }
       }
+      ctx = LC.getContext('2d');
       ctx.strokeStyle = p.color;
-      if (p.glow) { ctx.shadowColor = p.glowColor; ctx.shadowBlur = p.glowSize * k; }
 
       const line = (o, lw) => {
         const [x, y, w, h, r] = at(o);
@@ -218,6 +230,27 @@
       };
       if (p.style === 'double') { line(t / 2, t); line(t * 1.5 + p.dgap * k, t); }
       else line(t / 2, t);
+
+      let Fw = FC, Lw = LC;
+      if (U.wearActive(p)) {
+        const S = Math.min(W, H), sil = U.canvas(W, H), sc = sil.getContext('2d');
+        sc.drawImage(FC, 0, 0); sc.drawImage(LC, 0, 0); // edge wear follows the whole frame's outline
+        const F = U.wearFields(W, H, p, S, sil);
+        U.wearScratches(LC.getContext('2d'), W, H, p, S);
+        if (p.fill) U.wearScratches(FC.getContext('2d'), W, H, p, S);
+        Lw = U.imageCanvas(U.wearApply(LC, p, F));
+        if (p.fill) Fw = U.imageCanvas(U.wearApply(FC, p, F));
+      }
+      out.drawImage(Fw, 0, 0);
+      if (p.glow) {
+        // draw the lines far off-canvas and shift only their shadow back in
+        const far = W * 4;
+        out.save();
+        out.shadowColor = p.glowColor; out.shadowBlur = p.glowSize * k; out.shadowOffsetX = far;
+        out.drawImage(Lw, -far, 0);
+        out.restore();
+      }
+      out.drawImage(Lw, 0, 0);
     },
   });
 })();

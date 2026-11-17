@@ -114,6 +114,7 @@
     const sx = Math.max(0.01, l.scale), sy = Math.max(0.01, l.scale * l.stretch);
     const bound = (reach(l) + l.distort * 0.45 + 0.02) * Math.max(sx, sy), bound2 = bound * bound;
     const ns = l.nScale, useMask = l.type === 'noise' || l.noiseMask > 0;
+    const nox = l.nox || 0, noy = l.noy || 0; // noise scroll (flipbook)
     let i = 0;
     for (let y = 0; y < H; y++) {
       const gy = (y + 0.5 - H / 2) / (S / 2) - l.y;
@@ -122,14 +123,14 @@
         if (gx * gx + gy * gy > bound2) continue;
         let u = (gx * cs + gy * sn) / sx, v = (-gx * sn + gy * cs) / sy;
         if (l.distort > 0) {
-          const w1 = U.fractal('perlin', u * ns + 17.3, v * ns + 5.1, 0, 0, 3, 0.5, 'fbm', l.seed + 11);
-          const w2 = U.fractal('perlin', u * ns + 3.7, v * ns + 41.9, 0, 0, 3, 0.5, 'fbm', l.seed + 23);
+          const w1 = U.fractal('perlin', u * ns + 17.3 + nox, v * ns + 5.1 + noy, 0, 0, 3, 0.5, 'fbm', l.seed + 11);
+          const w2 = U.fractal('perlin', u * ns + 3.7 + nox, v * ns + 41.9 + noy, 0, 0, 3, 0.5, 'fbm', l.seed + 23);
           u += (w1 - 0.5) * l.distort * 0.9;
           v += (w2 - 0.5) * l.distort * 0.9;
         }
         let I = shapeI(l, u, v);
         if (I > 0.001 && useMask) {
-          let n = U.fractal('perlin', u * ns, v * ns, 0, 0, l.nOct, 0.5, l.nType, l.seed);
+          let n = U.fractal('perlin', u * ns + nox, v * ns + noy, 0, 0, l.nOct, 0.5, l.nType, l.seed);
           n = U.clamp((n - 0.5) * l.nContrast + 0.5);
           I = l.type === 'noise' ? n : I * (1 - l.noiseMask * (1 - n));
         }
@@ -167,6 +168,15 @@
       { key: 'edgeStart', label: 'Fade start', type: 'range', min: 0.3, max: 1, step: 0.01, default: 0.82, show: (p) => p.edgeFade },
       { key: 'bgMode', label: 'Background', type: 'select', default: 'transparent', options: [['transparent', 'Transparent'], ['color', 'Solid color']] },
       { key: 'bgColor', label: 'Background color', type: 'color', default: '#000000', show: (p) => p.bgMode === 'color' },
+
+      { type: 'section', label: 'Flipbook', active: () => false },
+      { key: 'fbSpin', label: 'Spin over the animation', type: 'range', min: -720, max: 720, step: 1, default: 40, tip: 'Degrees every layer turns from the first to the last frame (Tilesheet mode)' },
+      { key: 'fbSpinVar', label: 'Spin variation', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, tip: 'Layers turn at different speeds (some the other way at 1)' },
+      { key: 'fbNoise', label: 'Noise evolution', type: 'range', min: 0, max: 4, step: 0.01, default: 1, tip: 'How far the noise scrolls over the animation: smoke and fire churn instead of standing still' },
+      { key: 'fbNoiseDir', label: 'Noise direction', type: 'range', min: -180, max: 180, step: 1, default: -90, show: (p) => p.fbNoise > 0, tip: '-90 = noise moves up' },
+      { key: 'fbBoil', label: 'Boil while fading', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, tip: 'More distortion as the particle dissipates' },
+      { key: 'fbRise', label: 'Rise', type: 'range', min: -1, max: 1, step: 0.01, default: 0, tip: 'Layers drift up (positive) or down over the animation' },
+      { key: 'fbScale', label: 'Scale animation', type: 'range', min: 0, max: 1, step: 0.01, default: 1, tip: 'How strongly the tilesheet start / end size scales the layers (0 = constant size)' },
 
       { type: 'section', label: 'Layers (bottom → top)' },
       {
@@ -322,6 +332,24 @@
         { size: 0.18, power: 1.4, blend: 'add', color: '#ffffff' },
       ] } },
     ],
+    /* tilesheet / flipbook: scale with the lifecycle size, spin, scroll + boil the noise, rise, fade */
+    animate(p, f) {
+      const t = f.t, dir = (p.fbNoiseDir * Math.PI) / 180;
+      const size = 1 + (f.size - 1) * p.fbScale, energy = Math.min(1, f.energy);
+      p.layers = p.layers.map((l, i) => {
+        const L = Object.assign({}, LAYER, l), h = U.hash(i, 3, 77) * 2 - 1; // per-layer variation -1..1
+        L.scale *= size;
+        L.x *= size; L.y = L.y * size - p.fbRise * t;
+        L.rotation += p.fbSpin * t * (1 + h * p.fbSpinVar);
+        L.nox = Math.cos(dir) * p.fbNoise * t * (1 + h * 0.2);
+        L.noy = Math.sin(dir) * p.fbNoise * t * (1 + h * 0.2);
+        L.distort = Math.min(1, L.distort + f.dissolve * p.fbBoil);
+        L.opacity *= energy;
+        L.seed += f.seedOffset;
+        return L;
+      });
+      return p;
+    },
     render(ctx, W, H, p) {
       const S = Math.min(W, H);
       let out = U.canvas(W, H), oc = out.getContext('2d');

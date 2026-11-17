@@ -254,6 +254,21 @@
         row.append(label, wrap);
         break;
       }
+      case 'button': {
+        // a row of action buttons: buttons: [{ label, run(values, rootValues), tip }]; run edits the values
+        row.textContent = '';
+        const wrap = el('div', 'btn-row');
+        for (const b of d.buttons) {
+          const btn = el('button', 'btn small' + (b.primary ? ' primary' : ''), U.t(b.label));
+          btn.type = 'button';
+          if (b.icon) btn.insertAdjacentHTML('afterbegin', U.ICONS[b.icon] || '');
+          if (b.tip) btn.title = U.t(b.tip);
+          btn.onclick = () => { b.run(values, rootVals); hooks.change(true); };
+          wrap.append(btn);
+        }
+        row.append(wrap);
+        break;
+      }
       case 'list': {
         const items = values[d.key];
         const head = el('div', 'list-head');
