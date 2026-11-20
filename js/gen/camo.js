@@ -43,8 +43,9 @@
   U.register({
     id: 'camo',
     name: 'Camo',
-    desc: 'Tileable woodland, digital, tiger, splinter, flecktarn camo',
-    tags: ['Texturing', 'Shooter'],
+    desc: 'Tileable woodland, digital, tiger stripe, splinter and flecktarn camouflage with chip and rain overlays',
+    uses: ['Camouflage textures for uniforms, vehicles, weapon skins and gear in military shooters.', 'Patterned backgrounds for military-themed UI panels, posters and merchandise.'],
+    tags: ['Texturing', 'Shooter', 'Military'],
     tileable: true,
     icon: U.icon('<path d="M3.5 8c2.5-3 5 0 7.5-1.5S15 3 17 5s3.5 2.5 3 5-3 2-4.5 4-4 5-7 4-3-3-4.5-4S1.5 10.5 3.5 8z"/><path d="M8 10c1-1 3 0 3 1.5S9 14 8 13s-1-2 0-3z"/>'),
     params: [
@@ -69,7 +70,7 @@
       { key: 'rough', label: 'Roughness', type: 'range', min: 0.2, max: 0.8, step: 0.01, default: 0.5, show: blobby },
       { key: 'dotSize', label: 'Dot size', type: 'range', min: 0.1, max: 0.6, step: 0.01, default: 0.35, show: (p) => p.pattern === 'flecktarn' },
       { key: 'seed', label: 'Seed', type: 'seed', default: 2024 },
-      { type: 'section', label: 'Colors' },
+      { type: 'section', label: 'Color' },
       { key: 'count', label: 'Colors', type: 'int', min: 2, max: 6, default: 4 },
       ...colorParams,
       { type: 'section', label: 'Overlay' },

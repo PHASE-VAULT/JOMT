@@ -15,18 +15,32 @@
   const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
   const h3 = (x, y, z, s) => U.hash(x + Math.imul(z, 374761), y - Math.imul(z, 668265), s);
   const GX = G3.map((g) => g[0]), GY = G3.map((g) => g[1]), GZ = G3.map((g) => g[2]);
+  // a shuffled permutation table + one random offset per seed: much cheaper than hashing every corner
+  const PERM = (() => {
+    const r = U.rng(90210), a = Array.from({ length: 256 }, (_, i) => i);
+    for (let i = 255; i > 0; i--) { const j = (r() * (i + 1)) | 0; const t = a[i]; a[i] = a[j]; a[j] = t; }
+    const pm = new Uint8Array(512);
+    for (let i = 0; i < 512; i++) pm[i] = a[i & 255];
+    return pm;
+  })();
+  const OFF = new Map();
+  const offOf = (s) => { let o = OFF.get(s); if (!o) { o = [U.hash(s, 1, 7) * 4096, U.hash(s, 2, 7) * 4096, U.hash(s, 3, 7) * 4096]; OFF.set(s, o); } return o; };
   function perlin3(x, y, z, s) {
-    const X = Math.floor(x), Y = Math.floor(y), Z = Math.floor(z), fx = x - X, fy = y - Y, fz = z - Z;
+    const o = offOf(s);
+    x += o[0]; y += o[1]; z += o[2];
+    const Xf = Math.floor(x), Yf = Math.floor(y), Zf = Math.floor(z), fx = x - Xf, fy = y - Yf, fz = z - Zf;
+    const X = Xf & 255, Y = Yf & 255, Z = Zf & 255;
     const u = fade(fx), v = fade(fy), w = fade(fz), gx = fx - 1, gy = fy - 1, gz = fz - 1;
+    const A = PERM[X] + Y, AA = PERM[A] + Z, AB = PERM[A + 1] + Z, B = PERM[X + 1] + Y, BA = PERM[B] + Z, BB = PERM[B + 1] + Z;
     let q;
-    q = (h3(X, Y, Z, s) * 12) | 0; const n000 = GX[q] * fx + GY[q] * fy + GZ[q] * fz;
-    q = (h3(X + 1, Y, Z, s) * 12) | 0; const n100 = GX[q] * gx + GY[q] * fy + GZ[q] * fz;
-    q = (h3(X, Y + 1, Z, s) * 12) | 0; const n010 = GX[q] * fx + GY[q] * gy + GZ[q] * fz;
-    q = (h3(X + 1, Y + 1, Z, s) * 12) | 0; const n110 = GX[q] * gx + GY[q] * gy + GZ[q] * fz;
-    q = (h3(X, Y, Z + 1, s) * 12) | 0; const n001 = GX[q] * fx + GY[q] * fy + GZ[q] * gz;
-    q = (h3(X + 1, Y, Z + 1, s) * 12) | 0; const n101 = GX[q] * gx + GY[q] * fy + GZ[q] * gz;
-    q = (h3(X, Y + 1, Z + 1, s) * 12) | 0; const n011 = GX[q] * fx + GY[q] * gy + GZ[q] * gz;
-    q = (h3(X + 1, Y + 1, Z + 1, s) * 12) | 0; const n111 = GX[q] * gx + GY[q] * gy + GZ[q] * gz;
+    q = PERM[AA] % 12; const n000 = GX[q] * fx + GY[q] * fy + GZ[q] * fz;
+    q = PERM[BA] % 12; const n100 = GX[q] * gx + GY[q] * fy + GZ[q] * fz;
+    q = PERM[AB] % 12; const n010 = GX[q] * fx + GY[q] * gy + GZ[q] * fz;
+    q = PERM[BB] % 12; const n110 = GX[q] * gx + GY[q] * gy + GZ[q] * fz;
+    q = PERM[AA + 1] % 12; const n001 = GX[q] * fx + GY[q] * fy + GZ[q] * gz;
+    q = PERM[BA + 1] % 12; const n101 = GX[q] * gx + GY[q] * fy + GZ[q] * gz;
+    q = PERM[AB + 1] % 12; const n011 = GX[q] * fx + GY[q] * gy + GZ[q] * gz;
+    q = PERM[BB + 1] % 12; const n111 = GX[q] * gx + GY[q] * gy + GZ[q] * gz;
     const x00 = n000 + (n100 - n000) * u, x10 = n010 + (n110 - n010) * u, x01 = n001 + (n101 - n001) * u, x11 = n011 + (n111 - n011) * u;
     const y0 = x00 + (x10 - x00) * v, y1 = x01 + (x11 - x01) * v;
     return y0 + (y1 - y0) * w;
@@ -41,7 +55,7 @@
     return clamp((sum / nrm) * 0.85 + 0.5);
   }
   /* crater field: height offset at a point on the unit sphere (one cell layer) */
-  function craters(x, y, z, f, density, s) {
+  function craters(x, y, z, f, density, s, rim = 1) {
     const X = x * f, Y = y * f, Z = z * f, cx = Math.floor(X), cy = Math.floor(Y), cz = Math.floor(Z);
     let h = 0;
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (let k = -1; k <= 1; k++) {
@@ -53,7 +67,7 @@
       // soft bowl + low, wide rim; depth varies per crater so they don't all look stamped in the same way
       const dep = 0.3 + 0.3 * h3(ix, iy, iz, s + 5);
       h += d < 1 ? -Math.pow(1 - d * d, 1.5) * dep : 0;
-      h += Math.exp(-(((d - 1) / 0.3) ** 2)) * dep * 0.4; // rim
+      h += Math.exp(-(((d - 1) / 0.3) ** 2)) * dep * 0.4 * rim; // rim
     }
     return h;
   }
@@ -64,13 +78,14 @@
   U.register({
     id: 'planet',
     name: 'Planet',
-    desc: 'Planets and moons for distance impostors: terran, cratered, gas giant, lava, ice; clouds, atmosphere, phase lighting, rings',
+    desc: 'Lit planets and moons: terran, cratered, gas giant, lava or ice, with clouds, atmosphere, phases and rings',
+    uses: ['Distant planet impostors and skybox elements for space games and sci-fi scenes.', 'Planet icons for star maps, galaxy menus and level selection screens.'],
     tags: ['VFX', 'Nature', 'Sci-fi'],
     bg: 'black',
     icon: U.icon('<circle cx="12" cy="12" r="6.5"/><ellipse cx="12" cy="12" rx="10.5" ry="3.2" transform="rotate(-18 12 12)"/>'),
     params: [
       { type: 'section', label: 'Planet' },
-      { key: 'surface', label: 'Surface', type: 'select', default: 'terran', options: [['terran', 'Terran (oceans + land)'], ['rocky', 'Rocky / cratered'], ['gas', 'Gas giant (bands)'], ['lava', 'Lava world'], ['ice', 'Ice world']] },
+      { key: 'surface', label: 'Surface', type: 'select', default: 'terran', options: [['terran', 'Terran (oceans + land)'], ['rocky', 'Rocky / cratered'], ['gas', 'Gas giant (bands)'], ['lava', 'Lava world'], ['ice', 'Ice world']], apply: (v, p) => { if ((v === 'rocky' || v === 'ice') && !(p.craters > 0)) p.craters = 0.6; }, },
       { key: 'size', label: 'Size', type: 'range', min: 0.2, max: 0.98, step: 0.005, default: 0.78, tip: 'Planet diameter as a fraction of the texture (leave room for atmosphere and rings)' },
       { key: 'scale', label: 'Feature scale', type: 'range', min: 0.3, max: 6, step: 0.05, default: 1.6 },
       { key: 'detail', label: 'Detail', type: 'int', min: 2, max: 8, default: 6 },
@@ -78,21 +93,24 @@
       { key: 'tilt', label: 'Axial tilt', type: 'range', min: -90, max: 90, step: 0.5, default: 18 },
       { key: 'relief', label: 'Relief', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, tip: 'Shading from mountains and craters' },
       { key: 'seed', label: 'Seed', type: 'seed', default: 11 },
-      { type: 'section', label: 'Colors' },
-      { key: 'c1', label: 'Color 1 (deep / low)', type: 'color', default: '#0a2a5a' },
-      { key: 'c2', label: 'Color 2', type: 'color', default: '#1e5e9a' },
-      { key: 'c3', label: 'Color 3', type: 'color', default: '#4a7a32' },
-      { key: 'c4', label: 'Color 4', type: 'color', default: '#8a7a52' },
-      { key: 'c5', label: 'Color 5 (high / ice)', type: 'color', default: '#f2f4f6' },
+      { type: 'section', label: 'Surface' },
       { key: 'sea', label: 'Sea level', type: 'range', min: 0, max: 1, step: 0.01, default: 0.52, show: (p) => p.surface === 'terran' },
       { key: 'ice', label: 'Polar ice', type: 'range', min: 0, max: 1, step: 0.01, default: 0.25, show: (p) => p.surface === 'terran' || p.surface === 'rocky' },
       { key: 'bands', label: 'Bands', type: 'range', min: 2, max: 30, step: 0.5, default: 9, show: (p) => p.surface === 'gas' },
       { key: 'turb', label: 'Turbulence', type: 'range', min: 0, max: 1, step: 0.01, default: 0.45, show: (p) => p.surface === 'gas' },
       { key: 'storm', label: 'Storm spot', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, show: (p) => p.surface === 'gas' },
-      { key: 'craters', label: 'Craters', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6, show: (p) => p.surface === 'rocky' || p.surface === 'ice' },
+      { key: 'craters', label: 'Craters', type: 'range', min: 0, max: 1, step: 0.01, default: 0, tip: 'Terran planets: only on land, water fills them', show: (p) => p.surface === 'rocky' || p.surface === 'ice' || p.surface === 'terran' },
+      { key: 'craterDepth', label: 'Crater depth', type: 'range', min: 0, max: 3, step: 0.01, default: 1, show: (p) => (p.surface === 'rocky' || p.surface === 'ice' || p.surface === 'terran') && p.craters > 0, tip: '0 = flat (craters only change the color), 1 = default, higher = deep bowls with strong shading' },
+      { key: 'craterRim', label: 'Rim height', type: 'range', min: 0, max: 3, step: 0.01, default: 1, show: (p) => (p.surface === 'rocky' || p.surface === 'ice' || p.surface === 'terran') && p.craters > 0, tip: 'Height of the raised walls around each crater' },
       { key: 'maria', label: 'Dark plains', type: 'range', min: 0, max: 1, step: 0.01, default: 0.4, show: (p) => p.surface === 'rocky' },
-      { key: 'glowColor', label: 'Glow color', type: 'color', default: '#ff6a1a', show: (p) => p.surface === 'lava', tip: 'Emissive lava cracks' },
       { key: 'cracks', label: 'Cracks', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, show: (p) => p.surface === 'lava' || p.surface === 'ice' },
+      { type: 'section', label: 'Color' },
+      { key: 'c1', label: 'Color 1 (deep / low)', type: 'color', default: '#0a2a5a' },
+      { key: 'c2', label: 'Color 2', type: 'color', default: '#1e5e9a' },
+      { key: 'c3', label: 'Color 3', type: 'color', default: '#4a7a32' },
+      { key: 'c4', label: 'Color 4', type: 'color', default: '#8a7a52' },
+      { key: 'c5', label: 'Color 5 (high / ice)', type: 'color', default: '#f2f4f6' },
+      { key: 'glowColor', label: 'Glow color', type: 'color', default: '#ff6a1a', show: (p) => p.surface === 'lava', tip: 'Emissive lava cracks' },
       { type: 'section', label: 'Clouds & night' },
       { key: 'clouds', label: 'Clouds', type: 'range', min: 0, max: 1, step: 0.01, default: 0.45 },
       { key: 'cloudColor', label: 'Cloud color', type: 'color', default: '#ffffff', show: (p) => p.clouds > 0 },
@@ -150,22 +168,8 @@
       const sc = p.scale, oct = p.detail;
       const rt = Math.max(0.02, Math.sin(p.ringTilt * RAD)), rct = Math.cos(p.ringTilt * RAD);
 
-      /* relief height at planet-space point q: a cheap version of the surface height */
-      const heightAt = (q) => {
-        const [x, y, z] = q;
-        switch (p.surface) {
-          case 'terran': return { h: Math.max(p.sea, fbm3(x * sc, y * sc, z * sc, Math.max(2, oct - 2), seed)), cr: 0 };
-          case 'rocky':
-          case 'ice': {
-            const cr = p.craters > 0 ? craters(x, y, z, sc * 3, p.craters * 0.5, seed + 21) + craters(x, y, z, sc * 9, p.craters * 0.45, seed + 22) * 0.3 : 0;
-            return { h: fbm3(x * sc, y * sc, z * sc, 3, seed) * 0.3 + cr * 0.35, cr };
-          }
-          case 'lava': return { h: fbm3(x * sc, y * sc, z * sc, 3, seed) * 0.4, cr: 0 };
-          default: return { h: 0, cr: 0 };
-        }
-      };
       /* albedo + emissive + height at planet-space point q */
-      const surf = (q, hc) => {
+      const surf = (q) => {
         const [x, y, z] = q;
         let col, emit = null, h = 0, land = 0;
         switch (p.surface) {
@@ -176,7 +180,17 @@
             else {
               const t = clamp((h - p.sea) / Math.max(0.01, 1 - p.sea) * 2.2); land = 1;
               col = t < 0.5 ? mix3(C[2], C[3], t * 2) : mix3(C[3], C[4], clamp((t - 0.5) * 2) ** 2);
-              h = p.sea + (h - p.sea) * 1.5;
+            }
+            const coast = smoothstep(p.sea, p.sea + 0.04, h); // 0 in the water, 1 a little inland
+            // relief height: a smooth, unwarped version of the terrain with flat oceans (the warped color
+            // field would shade into streaks)
+            h = Math.max(p.sea, fbm3(x * sc, y * sc, z * sc, Math.max(2, oct - 2), seed));
+            // craters only on land (water fills / hides them), fading out at the coast
+            if (p.craters > 0 && coast > 0) {
+              const rim = p.craterRim ?? 1, cd = p.craterDepth ?? 1;
+              const cr = (craters(x, y, z, sc * 3, p.craters * 0.5, seed + 21, rim) + craters(x, y, z, sc * 9, p.craters * 0.45, seed + 22, rim) * 0.3) * cd * coast;
+              h += cr * 0.35;
+              col = col.map((v, i) => v * (1 + cr * 0.12) + (C[3][i] - v) * clamp(cr) * 0.12);
             }
             break;
           }
@@ -188,7 +202,9 @@
             if (p.surface === 'ice') { const c = fbm3(x * sc * 2, y * sc * 2, z * sc * 2, 4, seed + 13, true); const cr = smoothstep(0.75 - p.cracks * 0.25, 0.9, c); col = mix3(mix3(C[1], C[2], n), C[4], cr * 0.85); }
             h = n * 0.3;
             if (p.craters > 0) {
-              const cr = hc.cr; // computed once in heightAt
+              // crater depth scales bowls and rims (rims also by their own height)
+              const rim = p.craterRim ?? 1, cd = p.craterDepth ?? 1;
+              const cr = (craters(x, y, z, sc * 3, p.craters * 0.5, seed + 21, rim) + craters(x, y, z, sc * 9, p.craters * 0.45, seed + 22, rim) * 0.3) * cd;
               h += cr * 0.35;
               col = col.map((v, i) => v * (1 + cr * 0.12) + (C[3][i] - v) * clamp(cr) * 0.12);
             }
@@ -223,7 +239,7 @@
           }
         }
         // polar ice
-        if (p.ice > 0 && (p.surface === 'terran' || p.surface === 'rocky')) {
+        if (p.ice > 0 && (p.surface === 'terran' || p.surface === 'rocky') && Math.abs(y) > 1 - p.ice * 0.55 - 0.12) {
           const lim = 1 - p.ice * 0.55 + (fbm3(x * 4, y * 4, z * 4, 3, seed + 31) - 0.5) * 0.15;
           const ic = smoothstep(lim - 0.03, lim + 0.03, Math.abs(y));
           col = mix3(col, C[4], ic); if (ic > 0.5) land = 0;
@@ -231,53 +247,83 @@
         return { col, emit, h, land };
       };
 
-      let i = 0;
-      for (let py = 0; py < H; py++) {
-        for (let px = 0; px < W; px++, i += 4) {
+      /* pass 1: surface, clouds and city lights for every pixel on the disc. The surface height goes into a
+         buffer, so the relief shading (pass 2) compares neighbouring pixels instead of evaluating the
+         whole surface a second time */
+      const N = W * H, INS = new Uint8Array(N), HB = new Float32Array(N), COL = new Float32Array(N * 3);
+      const EM = p.surface === 'lava' ? new Float32Array(N * 3) : null, CA = new Float32Array(N), CT = new Float32Array(N);
+      const L0 = L[0], L1 = L[1], L2 = L[2];
+      for (let py = 0, j = 0; py < H; py++) {
+        for (let px = 0; px < W; px++, j++) {
+          const x = (px + 0.5 - cx) / R, y = -(py + 0.5 - cy) / R, r2 = x * x + y * y;
+          if (r2 >= 1) continue;
+          const z = Math.sqrt(1 - r2), q = toPlanet(x, y, z), sf = surf(q), k3 = j * 3;
+          INS[j] = 1; HB[j] = sf.h;
+          COL[k3] = sf.col[0]; COL[k3 + 1] = sf.col[1]; COL[k3 + 2] = sf.col[2];
+          if (EM && sf.emit) { EM[k3] = sf.emit[0]; EM[k3 + 1] = sf.emit[1]; EM[k3 + 2] = sf.emit[2]; }
+          let land = sf.land;
+          if (p.clouds > 0) {
+            const cs = p.cloudScale, w = fbm3(q[0] * cs + 13, q[1] * cs, q[2] * cs, 2, seed + 41) - 0.5;
+            const cn = fbm3(q[0] * cs * 1.5 + w, q[1] * cs * 2.2 + w, q[2] * cs * 1.5, 4, seed + 42);
+            const ca = smoothstep(0.62 - p.clouds * 0.25, 0.8 - p.clouds * 0.2, cn) * Math.min(1, p.clouds * 1.4);
+            CA[j] = ca; land *= 1 - ca;
+          }
+          if (p.cities > 0 && land > 0.5) {
+            const night = 1 - smoothstep(-0.05, 0.15, x * L0 + y * L1 + z * L2);
+            if (night > 0) {
+              const cn = fbm3(q[0] * 30, q[1] * 30, q[2] * 30, 2, seed + 51), ct = fbm3(q[0] * 4, q[1] * 4, q[2] * 4, 2, seed + 52);
+              CT[j] = smoothstep(0.62, 0.72, cn) * smoothstep(0.45, 0.6, ct) * p.cities * night;
+            }
+          }
+        }
+      }
+      // height between pixel centres (bilinear); off the disc it falls back to the pixel's own height
+      const hAt = (fx, fy, fb) => {
+        const x0 = Math.floor(fx - 0.5), y0 = Math.floor(fy - 0.5), tx = fx - 0.5 - x0, ty = fy - 0.5 - y0;
+        if (x0 < 0 || y0 < 0 || x0 + 1 >= W || y0 + 1 >= H) return fb;
+        const k = y0 * W + x0;
+        if (!INS[k] || !INS[k + 1] || !INS[k + W] || !INS[k + W + 1]) return fb;
+        const a = HB[k] + (HB[k + 1] - HB[k]) * tx, b = HB[k + W] + (HB[k + W + 1] - HB[k + W]) * tx;
+        return a + (b - a) * ty;
+      };
+
+      /* pass 2: lighting, relief, clouds, lights, atmosphere, rings */
+      const relief = p.relief > 0 && p.surface !== 'gas', e = 0.01;
+      for (let py = 0, j = 0, i = 0; py < H; py++) {
+        for (let px = 0; px < W; px++, j++, i += 4) {
           const x = (px + 0.5 - cx) / R, y = -(py + 0.5 - cy) / R, r2 = x * x + y * y, r = Math.sqrt(r2);
-          let out = [0, 0, 0], a = 0, planetZ = -1e9;
-          if (r2 < 1) {
-            const z = Math.sqrt(1 - r2), nl = x * L[0] + y * L[1] + z * L[2];
+          let cr = 0, cg = 0, cb = 0, a = 0, planetZ = -1e9;
+          if (INS[j]) {
+            const z = Math.sqrt(1 - r2), nl = x * L0 + y * L1 + z * L2, k3 = j * 3;
             planetZ = z;
-            const q = toPlanet(x, y, z), hc = heightAt(q), s = surf(q, hc);
             let shade = smoothstep(-p.terminator, p.terminator, nl) * (0.35 + 0.65 * Math.max(0, nl));
-            // relief: compare the height a little toward the light
-            if (p.relief > 0) {
-              const tx = L[0] - x * nl, ty = L[1] - y * nl, tzv = L[2] - z * nl, tl = Math.hypot(tx, ty, tzv) || 1, e = 0.01;
-              const q2 = toPlanet(x + (tx / tl) * e, y + (ty / tl) * e, z + (tzv / tl) * e);
-              if (p.surface !== 'gas') shade *= clamp(1 + (heightAt(q2).h - hc.h) * p.relief * 40, 0.4, 1.6);
+            // relief: compare the height a little toward the light (the same step on the sphere, read from the buffer)
+            if (relief) {
+              const tx = L0 - x * nl, ty = L1 - y * nl, tzv = L2 - z * nl, tl = Math.hypot(tx, ty, tzv) || 1;
+              const h2 = hAt(px + 0.5 + (tx / tl) * e * R, py + 0.5 - (ty / tl) * e * R, HB[j]);
+              shade *= clamp(1 + (h2 - HB[j]) * p.relief * 40, 0.4, 1.6);
             }
             const lit = p.ambient + (1 - p.ambient) * shade;
-            out = s.col.map((v) => v * lit);
-            // clouds (lit like the surface, a little brighter at the limb)
-            if (p.clouds > 0) {
-              const cs = p.cloudScale, w = fbm3(q[0] * cs + 13, q[1] * cs, q[2] * cs, 2, seed + 41) - 0.5;
-              const cn = fbm3(q[0] * cs * 1.5 + w, q[1] * cs * 2.2 + w, q[2] * cs * 1.5, 4, seed + 42);
-              const ca = smoothstep(0.62 - p.clouds * 0.25, 0.8 - p.clouds * 0.2, cn) * Math.min(1, p.clouds * 1.4);
-              out = out.map((v, k) => lerp(v, cloudC[k] * lit, ca));
-              s.land *= 1 - ca;
+            cr = COL[k3] * lit; cg = COL[k3 + 1] * lit; cb = COL[k3 + 2] * lit;
+            const ca = CA[j];
+            if (ca > 0) { cr = lerp(cr, cloudC[0] * lit, ca); cg = lerp(cg, cloudC[1] * lit, ca); cb = lerp(cb, cloudC[2] * lit, ca); }
+            const ct = CT[j];
+            if (ct > 0) { cr += cityC[0] * ct; cg += cityC[1] * ct; cb += cityC[2] * ct; }
+            if (EM) {
+              const night = 1 - smoothstep(-0.05, 0.15, nl), em = 0.4 + 0.6 * night;
+              cr += EM[k3] * em; cg += EM[k3 + 1] * em; cb += EM[k3 + 2] * em;
             }
-            // night side: city lights + lava glow
-            const night = 1 - smoothstep(-0.05, 0.15, nl);
-            if (p.cities > 0 && s.land > 0.5 && night > 0) {
-              const cn = fbm3(q[0] * 30, q[1] * 30, q[2] * 30, 2, seed + 51), ct = fbm3(q[0] * 4, q[1] * 4, q[2] * 4, 2, seed + 52);
-              const lights = smoothstep(0.62, 0.72, cn) * smoothstep(0.45, 0.6, ct) * p.cities * night;
-              out = out.map((v, k) => v + cityC[k] * lights);
-            }
-            if (s.emit) out = out.map((v, k) => v + s.emit[k] * (0.4 + 0.6 * night));
             // atmosphere: fresnel rim, scattering on the lit side
             if (p.atm > 0) {
-              const fres = Math.pow(1 - z, 3) * p.atm, sl = smoothstep(-0.3, 0.5, nl);
-              out = out.map((v, k) => v + atmC[k] * fres * (0.15 + sl));
-              const haze = p.atm * 0.12 * sl;
-              out = out.map((v, k) => lerp(v, atmC[k], haze * (1 - z)));
+              const fres = Math.pow(1 - z, 3) * p.atm, sl = smoothstep(-0.3, 0.5, nl), fk = fres * (0.15 + sl), hz = p.atm * 0.12 * sl * (1 - z);
+              cr = lerp(cr + atmC[0] * fk, atmC[0], hz); cg = lerp(cg + atmC[1] * fk, atmC[1], hz); cb = lerp(cb + atmC[2] * fk, atmC[2], hz);
             }
             a = 1;
-          } else if (p.atm > 0 && r < 1 + p.atmSize) {
+          } else if (p.atm > 0 && r < 1 + p.atmSize && r2 >= 1) {
             // outer glow beyond the limb, brighter where the limb faces the light
-            const t = (r - 1) / p.atmSize, nl = (x / r) * L[0] + (y / r) * L[1];
-            const g = Math.pow(1 - t, 2.2) * p.atm * (0.12 + smoothstep(-0.35, 0.45, nl + L[2] * 0.3));
-            out = atmC.map((v) => v); a = clamp(g);
+            const t = (r - 1) / p.atmSize, nl = (x / r) * L0 + (y / r) * L1;
+            const g = Math.pow(1 - t, 2.2) * p.atm * (0.12 + smoothstep(-0.35, 0.45, nl + L2 * 0.3));
+            cr = atmC[0]; cg = atmC[1]; cb = atmC[2]; a = clamp(g);
           }
           // rings: plane through the center, tilted toward the viewer
           if (p.rings > 0) {
@@ -292,18 +338,18 @@
                 let ra = p.rings * band * smoothstep(0, 0.06, t) * smoothstep(1, 0.9, t);
                 if (Math.abs(t - 0.62) < 0.025) ra *= 0.15; // a gap
                 // the planet's shadow on the far part of the rings: points behind the planet on the side away from the light
-                const along = x * L[0] + y * L[1], perp = Math.hypot(x - L[0] * along, y - L[1] * along);
+                const along = x * L0 + y * L1, perp = Math.hypot(x - L0 * along, y - L1 * along);
                 const inShadow = ringZ < 0 && along < 0 && perp < 1;
-                const rl = (inShadow ? 0.25 : 1) * (0.35 + 0.65 * Math.max(0.2, L[2] * 0.5 + 0.5));
-                const col = ringC.map((v) => v * rl);
+                const rl = (inShadow ? 0.25 : 1) * (0.35 + 0.65 * Math.max(0.2, L2 * 0.5 + 0.5));
+                const rr0 = ringC[0] * rl, rg0 = ringC[1] * rl, rb0 = ringC[2] * rl;
                 // straight (un-premultiplied) color: over nothing the ring keeps its own color
-                if (a <= 0) { out = col; a = ra; }
-                else { out = out.map((v, k) => lerp(v, col[k], ra)); a = a + ra * (1 - a); }
+                if (a <= 0) { cr = rr0; cg = rg0; cb = rb0; a = ra; }
+                else { cr = lerp(cr, rr0, ra); cg = lerp(cg, rg0, ra); cb = lerp(cb, rb0, ra); a = a + ra * (1 - a); }
               }
             }
           }
-          if (p.bgBlack) { d[i] = out[0] * a; d[i + 1] = out[1] * a; d[i + 2] = out[2] * a; d[i + 3] = 255; }
-          else { d[i] = out[0]; d[i + 1] = out[1]; d[i + 2] = out[2]; d[i + 3] = a * 255; }
+          if (p.bgBlack) { d[i] = cr * a; d[i + 1] = cg * a; d[i + 2] = cb * a; d[i + 3] = 255; }
+          else { d[i] = cr; d[i + 1] = cg; d[i + 2] = cb; d[i + 3] = a * 255; }
         }
       }
       ctx.putImageData(img, 0, 0);

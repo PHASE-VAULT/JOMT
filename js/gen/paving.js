@@ -108,7 +108,8 @@
   U.register({
     id: 'paving',
     name: 'Street Paving',
-    desc: 'Tileable street and sidewalk paving: cobblestones, setts, fan cobbles, herringbone pavers, slabs, hex pavers',
+    desc: 'Tileable cobblestones, setts, fan cobbles, herringbone, slabs and hex pavers with joints, moss and wetness',
+    uses: ['Street and sidewalk materials for city, village and medieval levels, with a height map for the normal map mode.', 'Top-down road and plaza tiles for 2D and strategy games.'],
     tags: ['Texturing'],
     tileable: true,
     heightMap: true,
@@ -130,7 +131,7 @@
       { key: 'brightVar', label: 'Brightness variation', type: 'range', min: 0, max: 1, step: 0.01, default: 0.3 },
       { key: 'grain', label: 'Surface grain', type: 'range', min: 0, max: 1, step: 0.01, default: 0.45 },
       { key: 'dome', label: 'Dome shading', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, tip: 'Darker toward the stone edges' },
-      { type: 'section', label: 'Joints & weathering' },
+      { type: 'section', label: 'Joints & wear' },
       { key: 'jointFill', label: 'Joint fill', type: 'select', default: 'sand', options: [['sand', 'Sand'], ['dirt', 'Dirt'], ['grass', 'Grass'], ['mortar', 'Mortar'], ['dark', 'Dark gap']], apply: (v, p) => { if (JOINTS[v]) p.jointColor = JOINTS[v]; } },
       { key: 'jointColor', label: 'Joint color', type: 'color', default: JOINTS.sand },
       { key: 'moss', label: 'Moss', type: 'range', min: 0, max: 1, step: 0.01, default: 0, tip: 'Green growth creeping from the joints' },

@@ -144,7 +144,8 @@
   U.register({
     id: 'pattern',
     name: 'Pattern',
-    desc: 'Seamless dots, squares, triangles, hexagons, stripes',
+    desc: 'Seamless dots, squares, triangles, hexagons and stripes with size modulation and row offsets',
+    uses: ['Tileable patterns for floors, fabrics, tread plates, carbon weave and wallpaper in 3D and 2D games.', 'Backgrounds and textures for web, print and UI design.'],
     tags: ['Texturing', 'UI'],
     tileable: true,
     icon: U.icon('<circle cx="6" cy="6" r="2.2"/><circle cx="18" cy="6" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="18" r="2.2"/>'),
@@ -178,7 +179,7 @@
       { key: 'modMax', label: 'Max scale', type: 'range', min: 0, max: 1, step: 0.01, default: 1, show: (p) => p.modType !== 'none' },
       { key: 'modCurve', label: 'Curve', type: 'range', min: 0.2, max: 4, step: 0.01, default: 1, show: (p) => p.modType !== 'none' },
       { key: 'modInvert', label: 'Invert', type: 'bool', default: false, show: (p) => p.modType !== 'none' },
-      { type: 'section', label: 'Colors' },
+      { type: 'section', label: 'Color' },
       { key: 'fg', label: 'Foreground', type: 'color', default: '#f2f2f2' },
       { key: 'twoTone', label: 'Second shape color', type: 'bool', default: false, show: is('triangles', 'hexagons') },
       { key: 'fg2', label: 'Foreground 2', type: 'color', default: '#ff8a3d', show: (p) => p.twoTone && ['triangles', 'hexagons'].includes(p.shape) },

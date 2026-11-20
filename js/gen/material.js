@@ -15,7 +15,8 @@
   U.register({
     id: 'material',
     name: 'Wood / Marble / Rust',
-    desc: 'Tileable procedural wood grain, marble veins and rusted metal',
+    desc: 'Tileable wood grain, marble veins and rusted metal with presets for wood species, marbles and corrosion',
+    uses: ['Base materials for furniture, floors, countertops and rusted props in 3D scenes.', 'Background textures for UI panels, cards and print designs.'],
     tags: ['Texturing', 'Nature'],
     tileable: true,
     icon: U.icon('<rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9c4 1.5 9-1.5 17 0M3.5 14c5 1 10-2 17 .5"/>'),
@@ -36,7 +37,7 @@
       { key: 'veins', label: 'Veins', type: 'int', min: 1, max: 10, default: 3, show: is('marble') },
       { key: 'coverage', label: 'Rust coverage', type: 'range', min: 0, max: 1, step: 0.01, default: 0.55, show: is('rust') },
       { key: 'pitting', label: 'Pitting', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, show: is('rust') },
-      { type: 'section', label: 'Colors' },
+      { type: 'section', label: 'Color' },
       { key: 'c1', label: 'Light / base', type: 'color', default: PRESETS.wood.c1 },
       { key: 'c2', label: 'Dark / veins / rust', type: 'color', default: PRESETS.wood.c2 },
       { key: 'c3', label: 'Accent', type: 'color', default: PRESETS.wood.c3 },

@@ -200,8 +200,9 @@
   U.register({
     id: 'graffiti',
     name: 'Graffiti & Blood Writing',
-    desc: 'Graffiti words or grungy, dripping bloody writing: outlines, 3D, drips, wobble and grunge',
-    tags: ['Decals', 'Texturing'],
+    desc: 'Graffiti words and dripping blood writing in bubble, block or wildstyle letters with 3D, drips and grunge',
+    uses: ['Wall decals for urban levels and horror scenes, from street pieces and tags to blood-written messages.', 'Stylized title and logo lettering for posters, thumbnails and comic panels.'],
+    tags: ['Horror', 'Decals', 'Texturing'],
     icon: U.icon('<path d="M3 17c1-6 3-9 5-9s2 5 0 9M3.5 13.5h4.5"/><path d="M11 17V8c3 0 4 1 4 2.5S13 13 11 13c3 0 4.5 1 4.5 2.2S14 17 11 17z"/><path d="M18 9l3 8M21 9l-3 8"/>'),
     params: [
       { type: 'section', label: 'Word' },
@@ -231,7 +232,7 @@
       { key: 'stars', label: 'Sparkles', type: 'int', min: 0, max: 20, default: 3 },
       { key: 'arrows', label: 'Arrows', type: 'int', min: 0, max: 8, default: 1 },
       { key: 'scribbles', label: 'Scribbled tags', type: 'int', min: 0, max: 20, default: 2, tip: 'Thin wobbly loops behind the piece' },
-      { type: 'section', label: 'Colors' },
+      { type: 'section', label: 'Color' },
       { key: 'palette', label: 'Palette', type: 'select', default: 'hiphop', options: PAL_OPTS, apply: (v, p) => { if (PALETTES[v]) Object.assign(p, PALETTES[v]); } },
       { key: 'c1', label: 'Color 1', type: 'color', default: PALETTES.hiphop.c1 },
       { key: 'c2', label: 'Color 2', type: 'color', default: PALETTES.hiphop.c2 },

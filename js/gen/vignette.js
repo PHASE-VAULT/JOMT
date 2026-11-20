@@ -13,7 +13,8 @@
   U.register({
     id: 'vignette',
     name: 'Vignette',
-    desc: 'Elliptic, round, rectangular or edge-only vignettes with full falloff control',
+    desc: 'Elliptic, round, rectangular or edge-only vignettes with falloff control as overlay, multiply map or mask',
+    uses: ['Screen-space darkening for camera vignettes, letterbox fades and text-backing gradients in game UIs.', 'Photo and video vignettes, or soft-edge masks for compositing.'],
     tags: ['UI', 'VFX', 'Lighting'],
     icon: U.icon('<rect x="3" y="4" width="18" height="16" rx="2"/><ellipse cx="12" cy="12" rx="5.5" ry="4.5" opacity=".6"/>'),
     params: [

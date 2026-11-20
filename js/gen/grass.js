@@ -240,7 +240,8 @@
   U.register({
     id: 'grass',
     name: 'Grass',
-    desc: 'Top-down grass ground or side-view grass cards with blade shape, wind and color variation',
+    desc: 'Tileable top-down grass ground or side-view grass strips with blade shape, wind, color and fallen leaves',
+    uses: ['Ground textures for lawns, meadows and autumn forest floors on terrain and level geometry.', 'Horizontally tiling grass edges for 2D platformer ground tiles.'],
     tags: ['Texturing', 'Nature'],
     tileable: true,
     icon: U.icon('<path d="M4 20c1-5 0-9-1-12"/><path d="M8 20c0-6 2-10 5-13"/><path d="M12 20c0-4-1-7-3-9"/><path d="M15 20c1-5 3-8 6-10"/><path d="M18 20c0-3-1-5-2-7"/>'),
@@ -262,7 +263,7 @@
       { key: 'clump', label: 'Clumping', type: 'range', min: 0, max: 1, step: 0.01, default: 0.35 },
       { key: 'clumps', label: 'Clump count', type: 'int', min: 2, max: 200, default: 40, show: (p) => p.clump > 0 },
       { key: 'rootJitter', label: 'Root height variation', type: 'range', min: 0, max: 0.5, step: 0.01, default: 0.06, show: isCard },
-      { type: 'section', label: 'Colors' },
+      { type: 'section', label: 'Color' },
       {
         key: 'preset', label: 'Preset', type: 'select', default: 'lush', options: [['lush', 'Lush'], ['meadow', 'Meadow'], ['dry', 'Dry / savanna'], ['stylized', 'Stylized'], ['custom', 'Custom']],
         apply: (v, p) => { if (PRESETS[v]) Object.assign(p, PRESETS[v]); },

@@ -122,7 +122,8 @@
   U.register({
     id: 'border',
     name: 'UI Border',
-    desc: 'Pure frames: solid, dashed, dotted or double, rounded / chamfered / square corners',
+    desc: 'UI frames with solid, dashed, dotted or double lines and rounded, chamfered or square corners',
+    uses: ['Frame textures for menus, cards, inventory slots and dialog boxes in game and app interfaces; import them as 9-slice sprites so the corners stay crisp at any size.', 'Outlines for stickers, badges and stitched-seam details in digital or printed graphics.'],
     tags: ['UI'],
     icon: U.icon('<rect x="3.5" y="5.5" width="17" height="13" rx="3" stroke-dasharray="3 2.2"/>'),
     params: [
@@ -135,7 +136,7 @@
       { key: 'dash', label: 'Dash length', type: 'range', min: 2, max: 128, step: 1, default: 24, show: is('dashed') },
       { key: 'gap', label: 'Gap', type: 'range', min: 1, max: 128, step: 1, default: 12, show: is('dashed', 'dotted') },
       { key: 'dgap', label: 'Line spacing', type: 'range', min: 1, max: 64, step: 0.5, default: 6, show: is('double') },
-      { type: 'section', label: 'Colors' },
+      { type: 'section', label: 'Color' },
       { key: 'color', label: 'Border', type: 'color', default: '#e8e8e8' },
       { key: 'fill', label: 'Fill inside', type: 'bool', default: false },
       { key: 'fillColor', label: 'Fill', type: 'color', default: '#20232a', show: (p) => p.fill },

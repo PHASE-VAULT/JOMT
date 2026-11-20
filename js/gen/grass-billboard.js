@@ -14,7 +14,8 @@
   U.register({
     id: 'grassCard',
     name: 'Grass Billboard',
-    desc: 'Side-view grass cards with tufts, leaves, seed heads and flowers, alpha ready',
+    desc: 'Side-view grass cards with tufts, broad leaves, seed heads and flowers, fitted inside the card with alpha',
+    uses: ['Alpha-tested billboards for scattering vegetation on 3D terrain, e.g. lawns, meadows, reeds and flower patches.', 'Foreground foliage sprites for 2D platformers and parallax scenes.'],
     tags: ['Nature', 'VFX'],
    
     icon: U.icon('<path d="M3 21h18"/><path d="M6 21c0-6-2-10-4-12"/><path d="M9 21c0-7 1-11 4-15"/><path d="M13 21c0-5 2-8 5-10"/><circle cx="18" cy="9" r="1.6"/><path d="M17 21c0-4-1-6-2-8"/>'),
@@ -51,7 +52,7 @@
       { key: 'flowerA', label: 'Flower color A', type: 'color', default: '#f4f1ff', show: hasFlowers },
       { key: 'flowerB', label: 'Flower color B', type: 'color', default: '#ffd23f', show: hasFlowers },
       { key: 'flowerCenter', label: 'Flower center', type: 'color', default: '#f2a20c', show: hasFlowers },
-      { type: 'section', label: 'Colors' },
+      { type: 'section', label: 'Color' },
       { key: 'root', label: 'Root', type: 'color', default: '#1d3812' },
       { key: 'tip', label: 'Tip', type: 'color', default: '#8ccf45' },
       { key: 'dry', label: 'Dry blades', type: 'color', default: '#c2ad5a' },

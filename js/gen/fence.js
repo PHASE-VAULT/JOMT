@@ -13,8 +13,9 @@
   U.register({
     id: 'fence',
     name: 'Fence',
-    desc: 'Alpha-cutout fences: chain-link, welded mesh, chicken wire, lattice, pickets, railings, slats, barbed wire',
-    tags: ['Texturing', 'Decals'],
+    desc: 'Alpha-cutout fences and meshes: chain-link, wire mesh, lattice, pickets, railings, slats and barbed wire',
+    uses: ['Alpha-tested textures for fences, grates and railings in 3D environments, tiling along long fence runs.', 'Foreground silhouettes and parallax layers in 2D side-scrollers.'],
+    tags: ['Texturing', 'Decals', 'Military'],
     normalMap: true,
     heightMap: true, // wires as round tubes, boards with beveled edges
     icon: U.icon('<path d="M5 21V7l1.5-2L8 7v14M11 21V7l1.5-2L14 7v14M17 21V7l1.5-2L20 7v14"/><path d="M3 10h18M3 17h18"/>'),

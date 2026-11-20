@@ -15,6 +15,10 @@
     </div>
     <div class="tabs" id="tabs"></div>
     <button class="add-tab" id="addTab" type="button" title="New texture (N)" data-i18n-title aria-label="New texture" data-i18n-aria><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+    <label class="insp-scale" title="Inspector size: scales the settings panel (remembered in this browser)" data-i18n-title>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M14.5 4.5v15M16.8 9h1.6M16.8 12h1.6M16.8 15h1.6"/></svg>
+      <select id="inspScale" aria-label="Inspector size" data-i18n-aria></select>
+    </label>
     <div class="lang-bar" id="langBar" role="group" aria-label="Language" data-i18n-aria></div>
   </header>
 
@@ -88,9 +92,11 @@
       <div class="panel-head">
         <div class="panel-titles">
           <div class="panel-title" id="genName"></div>
-          <div class="panel-sub" id="genDesc"></div>
         </div>
         <div class="panel-actions">
+          <button class="icon-btn" id="aboutBtn" type="button" title="Show / hide the use cases of this generator" data-i18n-title>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".6" fill="currentColor"/></svg>
+          </button>
           <button class="icon-btn" id="undoBtn" type="button" title="Undo (Ctrl+Z)" data-i18n-title disabled>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
           </button>
@@ -107,6 +113,8 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg>
           </button>
         </div>
+        <div class="panel-sub panel-mode-desc" id="genDesc"></div>
+        <div class="panel-about" id="genAbout" hidden><div id="genUses"></div></div>
       </div>
       <div class="mode-bar" id="modeBar" hidden>
         <div class="seg" id="modeSeg"></div>
@@ -172,8 +180,10 @@
   <script src="js/i18n/fr.js"></script>
   <script src="js/i18n/es.js"></script>
   <script src="js/i18n/it.js"></script>
+  <script src="js/i18n/generators.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/normal.js"></script>
+  <script src="js/smooth.js"></script>
   <script src="js/sheet.js"></script>
   <script src="js/wear.js"></script>
   <script src="js/bar.js"></script>
@@ -185,6 +195,7 @@
   <script src="js/gen/planks.js"></script>
   <script src="js/gen/plaster.js"></script>
   <script src="js/gen/paving.js"></script>
+  <script src="js/gen/rock.js"></script>
   <script src="js/gen/rubber-floor.js"></script>
   <script src="js/gen/material.js"></script>
   <script src="js/gen/camo.js"></script>
@@ -197,6 +208,11 @@
   <script src="js/gen/grime.js"></script>
   <script src="js/gen/scratches.js"></script>
   <script src="js/gen/debris.js"></script>
+  <script src="js/gen/maggots.js"></script>
+  <script src="js/gen/clouds.js"></script>
+  <script src="js/gen/loader.js"></script>
+  <script src="js/gen/marker.js"></script>
+  <script src="js/gen/map-grid.js"></script>
   <script src="js/gen/gradient.js"></script>
   <!-- decals -->
   <script src="js/gen/splatter.js"></script>

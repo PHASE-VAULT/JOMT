@@ -31,7 +31,8 @@
   U.register({
     id: 'lightning',
     name: 'Lightning',
-    desc: 'Branching lightning bolts with glow and an optional baked flow alpha for animating the strike',
+    desc: 'Branching lightning bolts with core and glow, plus an optional flow alpha for animating the strike',
+    uses: ['Lightning VFX sprites for storms, spells and electric weapons; step an alpha-clip threshold over the flow alpha to grow the bolt in a shader.', 'Electric arcs and sparks for UI effects, comic art and neon signs.'],
     tags: ['VFX', 'Sci-fi'],
     bg: 'black',
     icon: U.icon('<path d="M13 2L7 12h4l-3 10 9-13h-5l3-7z"/>'),

@@ -201,8 +201,9 @@
   U.register({
     id: 'bullet',
     name: 'Bullet / Round',
-    desc: 'Side view of an ammunition round, casing or projectile (rifle, pistol, shotgun), shaded as a metal surface of revolution, with normal map',
-    tags: ['Shooter', 'VFX', 'UI'],
+    desc: 'Side-view ammunition rounds in rifle, pistol and shotgun calibers with metal shading and normal map',
+    uses: ['Item icons and inventory sprites for ammunition in shooters and survival games, e.g. ammo counters, loot cards and shop screens.', 'Flat cards for cartridges and shell props in low-poly scenes, lit through the normal map.'],
+    tags: ['Shooter', 'Military', 'UI'],
     aspect: '4:1',
     normalMap: true,
     heightMap: true,

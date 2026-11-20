@@ -7,7 +7,8 @@
   U.register({
     id: 'scratches',
     name: 'Scratches',
-    desc: 'Tileable scratch / wear maps with direction and taper',
+    desc: 'Tileable scratch and wear maps with direction, curvature, jaggedness, taper and a clean-area falloff',
+    uses: ['Roughness and wear masks for brushed metal, worn paint, glass and car paint in physically based materials.', 'Claw marks and scuff overlays for stylized art and grungy UI.'],
     tags: ['Texturing', 'Decals'],
     tileable: true,
     icon: U.icon('<path d="M4 18c4-5 8-9 15-13"/><path d="M6 20c3-3 6-6 12-9" opacity=".55"/><path d="M3 12c3-2 5-3 8-4" opacity=".55"/>'),

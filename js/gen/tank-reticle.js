@@ -16,8 +16,9 @@
   U.register({
     id: 'tankReticle',
     name: 'Tank Reticle',
-    desc: 'Tank gunner sights: chevrons, mil scales, range ladders, rangefinder curves, brackets',
-    tags: ['UI', 'Shooter', 'Vehicles'],
+    desc: 'Tank gunner sights with chevrons, mil scales, range ladders, rangefinder curves and brackets',
+    uses: ['Gunner and commander sight overlays for tank and armored-vehicle games, with optional separate lens, reticle and emissive layers.', 'Targeting HUDs for mechs, turrets and other vehicle cockpits.'],
+    tags: ['UI', 'Military', 'Vehicles'],
     bg: 'gray',
     exportLayers: (p) => (p.split ? (p.lens ? [{ id: 'lens', suffix: 'lens' }] : []).concat([{ id: 'reticle', suffix: 'reticle' }, { id: 'emissive', suffix: 'emissive' }]) : null),
     icon: U.icon('<path d="M12 9l-3 4M12 9l3 4"/><path d="M2 12h5M17 12h5"/><path d="M5 12v-1.5M19 12v-1.5M9 12v-1M15 12v-1"/><path d="M12 15v6"/>'),

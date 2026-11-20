@@ -85,8 +85,9 @@
   U.register({
     id: 'insect',
     name: 'Insects & Spiders',
-    desc: 'Top-down spiders, beetles, flies, mosquitoes, butterflies, moths, roaches, ants and wasps with simple shading and normal map',
-    tags: ['Decals', 'Nature', 'VFX'],
+    desc: 'Top-down spiders, beetles, flies, butterflies, ants and more with shading, normal map and looping animation',
+    uses: ['Small creature sprites and decals for horror, survival and nature games, e.g. bugs crawling on walls, floors or corpses.', 'Icons and illustrations for collection screens, field guides and educational apps.'],
+    tags: ['Horror', 'Decals', 'Nature'],
     bg: 'checker',
     fixedAspect: '1:1',
     normalMap: true,
@@ -171,7 +172,7 @@
       { key: 'flapRate', label: 'Wing beats per loop', type: 'int', min: 1, max: 8, default: 3, show: (p) => p.animFlap > 0 },
       { key: 'animAntenna', label: 'Antenna twitch', type: 'range', min: 0, max: 1, step: 0.01, default: 0.4 },
 
-      { type: 'section', label: 'Shadow' },
+      { type: 'section', label: 'Drop shadow' },
       { key: 'shadow', label: 'Drop shadow', type: 'bool', default: true, tip: 'Soft shadow on the ground below (not in the normal map)' },
       { key: 'shadowAlpha', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, default: 0.35, show: (p) => p.shadow },
       { key: 'shadowBlur', label: 'Softness', type: 'range', min: 0, max: 40, step: 0.5, default: 10, show: (p) => p.shadow, tip: 'px @ 512' },

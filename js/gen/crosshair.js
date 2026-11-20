@@ -6,7 +6,8 @@
   U.register({
     id: 'crosshair',
     name: 'Simple Crosshair',
-    desc: 'CS-style crosshair: length, gap, thickness, outline, dot',
+    desc: 'Shooter crosshairs with adjustable line length, gap, thickness, outline and center dot',
+    uses: ['Static aim reticles for first- and third-person shooters, drawn at the center of the HUD.', 'Target markers and selection cursors for tools, editors and minigames.'],
     tags: ['UI', 'Shooter'],
     bg: 'gray',
     icon: U.icon('<path d="M12 3v6M12 15v6M3 12h6M15 12h6"/>'),

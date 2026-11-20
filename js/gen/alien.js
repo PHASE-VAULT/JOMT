@@ -77,8 +77,9 @@
 
   U.register({
     id: 'alien',
-    name: 'Detail Maps',
-    desc: 'Scatter configured shapes into tileable grayscale detail, smoothness and roughness masks',
+    name: 'Artifact Surfaces',
+    desc: 'Tileable grayscale detail maps from scattered shapes, with per-copy jitter, blending and a final remap',
+    uses: ['Abstract detail maps for wrapping artifacts and special objects such as alien relics, sci-fi props or magical items. Use them as height, roughness or smoothness masks to give the surface an otherworldly micro-structure.', 'Tileable fibre, scratch, droplet or pitting masks to break up roughness on ordinary materials such as brushed metal or dusty glass.'],
     tags: ['Texturing', 'Sci-fi'],
     tileable: true,
     icon: U.icon('<circle cx="7" cy="7" r="3.5"/><rect x="12.5" y="4" width="7" height="5"/><path d="M4 20l4-7 4 7z"/><path d="M14 13l6 6"/>'),

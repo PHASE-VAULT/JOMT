@@ -25,7 +25,8 @@
   U.register({
     id: 'visor',
     name: 'Visor Cracks',
-    desc: 'Cracked visor / glass decal: shattered hit with radial and ring cracks, scratches; square, placed in engine',
+    desc: 'Cracked visor and glass decals with a shattered hit, radial and ring cracks, scratches and smudges',
+    uses: ['Hit-damage decals on helmet visors, face shields and vehicle windows in shooters, scaled and positioned in the engine.', 'Broken-screen overlays for phones, monitors and HUD glitch effects.'],
     tags: ['UI', 'Shooter'],
     fixedAspect: '1:1',
     bg: 'black',

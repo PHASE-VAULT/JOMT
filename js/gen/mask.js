@@ -12,7 +12,8 @@
   U.register({
     id: 'mask',
     name: 'Mask',
-    desc: 'Inverted, feathered shape masks for UI highlights and mask / visor overlays',
+    desc: 'Overlay masks with feathered shape cutouts, mirrored pairs and an inverted highlight mode',
+    uses: ['Tutorial highlights that darken the UI around one element, and first-person gas mask, helmet or visor overlays.', 'Soft glow and spotlight sprites when inverted.'],
     tags: ['UI', 'VFX', 'Shooter'],
     icon: U.icon('<rect x="3" y="4" width="18" height="16" rx="2"/><ellipse cx="8.5" cy="11" rx="2.6" ry="2"/><ellipse cx="15.5" cy="11" rx="2.6" ry="2"/>'),
     params: [

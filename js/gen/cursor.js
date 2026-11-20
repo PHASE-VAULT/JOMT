@@ -311,7 +311,8 @@
   U.register({
     id: 'cursor',
     name: 'Cursor',
-    desc: 'Mouse cursors with gradients, bevel shading, gloss, glow and hotspot',
+    desc: 'Mouse cursors with outline, gradient, bevel, gloss and glow, exported with their hotspot position',
+    uses: ['Custom pointer graphics for game menus and RTS or RPG interfaces, with the hotspot ready for the engine\'s cursor setup.', 'Themed cursors for websites and desktop applications.'],
     tags: ['UI'],
     bg: 'gray',
     icon: U.icon('<path d="M5 3l13 8-5.5 1.5L10 18z"/>'),

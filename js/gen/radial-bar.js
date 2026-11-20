@@ -91,7 +91,8 @@
   U.register({
     id: 'radialbar',
     name: 'Radial Bar',
-    desc: 'Ring, arc and pie gauges: border, fill, segments, noise distortion and grunge, separate layer export',
+    desc: 'Ring, arc and pie gauges with border, fill, segments, noise and grunge, exportable as separate layers',
+    uses: ['Radial health, cooldown and stamina gauges for game HUDs; the exported progress map drives an alpha-clip fill in the engine.', 'Speedometers, timers and dial indicators for vehicle dashboards and app interfaces.'],
     tags: ['UI', 'Shooter'],
     aspect: '1:1',
     bg: 'gray',

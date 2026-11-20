@@ -2,11 +2,11 @@
    (bottom → top): vignettes with organic edge breakup, veins, cracks, blood splatter, droplets, drips from
    the top edge and flat tints / flashes. Each layer has its own colors, opacity and blend mode.
    Everything is placed in short-side units and the noise / blood fields are sampled on a fixed grid,
-   so the preview and every export size look the same. "Damage intensity" scales every layer so a game
-   can bake a few frames from light hit to near death.
-   Output: a normal overlay, or "alpha flow" where alpha holds how early each pixel appears (1 at the screen
-   edge → 0 innermost, following the noisy edge) so a shader threshold makes the damage creep inward.
-   Separate export: color overlay + grayscale flow map as aligned PNGs. */
+   so the preview and every export size look the same.
+   "Damage progress" (0..1) grows every layer between its own start and end (defaults per type: veins
+   race in early, the vignette creeps in from the edges over the whole range, drips run down late, splatter
+   blobs and droplets land one after another). The frame sequence export bakes N aligned PNGs along that
+   progress, to flip through in the engine (frame 1 = first damage … last frame = full damage). */
 (function () {
   'use strict';
   const U = window.UGTG;
@@ -22,25 +22,33 @@
   const isSides = (p) => p.shape === 'sides';
   const is = (...t) => (l) => t.includes(l.type);
   const EDGE = ['vignette', 'veins', 'cracks'], BLOOD = ['splatter', 'droplets', 'drips'];
+  // default growth window per layer type: [starts growing, fully grown] along the damage progress
+  const AUTO_TIME = { vignette: [0, 1], veins: [0, 0.45], cracks: [0.05, 0.55], splatter: [0.1, 0.75], droplets: [0, 0.65], drips: [0.35, 1], tint: [0, 0.3] };
+  const TIME = (type) => ({ tStart: AUTO_TIME[type][0], tEnd: AUTO_TIME[type][1] });
+  const timeWindow = (l) => [Math.min(l.tStart, l.tEnd - 0.01), Math.max(l.tEnd, l.tStart + 0.01)];
+  // progress of frame i of n: from `first` to full damage, spaced by `curve`
+  const frameT = (p, i) => { const n = Math.max(2, p.frameCount | 0); return p.frameFirst + (1 - p.frameFirst) * Math.pow(i / (n - 1), p.frameCurve); };
 
   // smooth maximum (k = blend width) so per-side shapes get rounded corners
   const smax = (a, b, k) => { const h = a - b; return 0.5 * (a + b + Math.sqrt(h * h + k * k)); };
 
   /* layer helpers for the presets (list items only need what differs from the item defaults) */
-  const V = (o) => Object.assign({ type: 'vignette' }, o);
-  const VEIN = (o) => Object.assign({ type: 'veins', color: '#1a0000', reach: 0.7, opacity: 0.6 }, o);
-  const CRACK = (o) => Object.assign({ type: 'cracks', color: '#1a0000', reach: 0.6, width: 0.3, opacity: 0.7 }, o);
+  const V = (o) => Object.assign({ type: 'vignette' }, TIME('vignette'), o);
+  const VEIN = (o) => Object.assign({ type: 'veins' }, TIME('veins'), { color: '#1a0000', reach: 0.7, opacity: 0.6 }, o);
+  const CRACK = (o) => Object.assign({ type: 'cracks' }, TIME('cracks'), { color: '#1a0000', reach: 0.6, width: 0.3, opacity: 0.7 }, o);
   const BL = { color: '#9a0606', color2: '#3c0101', opacity: 0.92 };
-  const SPL = (o) => Object.assign({ type: 'splatter', reach: 0.4, amount: 0.45 }, BL, o);
-  const DROP = (o) => Object.assign({ type: 'droplets', reach: 0.4, amount: 0.4 }, BL, o);
-  const DRIP = (o) => Object.assign({ type: 'drips', amount: 0.17, length: 0.4 }, BL, o);
-  const TINT = (o) => Object.assign({ type: 'tint', color: '#ff0000', opacity: 0.15 }, o);
+  const SPL = (o) => Object.assign({ type: 'splatter' }, TIME('splatter'), { reach: 0.4, amount: 0.45 }, BL, o);
+  const DROP = (o) => Object.assign({ type: 'droplets' }, TIME('droplets'), { reach: 0.4, amount: 0.4 }, BL, o);
+  const DRIP = (o) => Object.assign({ type: 'drips' }, TIME('drips'), { amount: 0.17, length: 0.4 }, BL, o);
+  const TINT = (o) => Object.assign({ type: 'tint' }, TIME('tint'), { color: '#ff0000', opacity: 0.15 }, o);
 
   const LAYER_DEFS = [
     { key: 'on', label: 'Visible', type: 'bool', default: true },
-    { key: 'type', label: 'Type', type: 'select', default: 'vignette', options: TYPES },
+    { key: 'type', label: 'Type', type: 'select', default: 'vignette', options: TYPES, apply: (v, l) => Object.assign(l, TIME(v)), tip: 'Changing the type also resets Start / End to the default timing of that type' },
     { key: 'blend', label: 'Blend', type: 'select', default: 'normal', options: BLENDS },
     { key: 'opacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, default: 0.9 },
+    { key: 'tStart', label: 'Start (damage progress)', type: 'range', min: 0, max: 1, step: 0.01, default: 0, tip: 'Damage progress at which this layer starts to grow (0 = right away)' },
+    { key: 'tEnd', label: 'End (damage progress)', type: 'range', min: 0, max: 1, step: 0.01, default: 1, tip: 'Damage progress at which this layer is fully grown. Defaults per type: veins 0 → 0.45, cracks 0.05 → 0.55, droplets 0 → 0.65, splatter 0.1 → 0.75, vignette 0 → 1, drips 0.35 → 1, tint 0 → 0.3' },
     { key: 'shape', label: 'Shape', type: 'select', default: 'global', options: [['global', 'Global shape']].concat(SHAPES), show: is(...EDGE) },
     { key: 'reach', label: 'Reach', type: 'range', min: 0.02, max: 1.5, step: 0.01, default: 0.5, show: (l) => l.type !== 'tint' && l.type !== 'drips', tip: 'How far the layer reaches in from the screen edge' },
     { key: 'softness', label: 'Softness', type: 'range', min: 0.02, max: 1, step: 0.01, default: 0.85, show: is('vignette'), tip: 'Width of the fade (fraction of the reach); low = hard inner edge' },
@@ -61,6 +69,7 @@
     { key: 'breakup', label: 'Breakup', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, show: is('vignette'), tip: 'Distorts the inner edge with noise for an organic look' },
     { key: 'breakScale', label: 'Breakup scale', type: 'range', min: 1, max: 20, step: 0.1, default: 4, show: (l) => l.type === 'vignette' && l.breakup > 0, tip: 'Noise features across the short side' },
     { key: 'seed', label: 'Seed offset', type: 'seed', default: 0, show: (l) => l.type !== 'tint' },
+
   ];
 
   const DEFAULT_LAYERS = [V({ opacity: 0.9 }), SPL({}), DROP({})];
@@ -68,15 +77,17 @@
   U.register({
     id: 'damage-vignette',
     name: 'Damage Vignette',
-    desc: 'Screen-space blood / damage vignette overlays: organic edges, splatter, drips and veins',
-    tags: ['VFX', 'Shooter', 'UI'],
+    desc: 'Screen overlays for player damage: blood vignettes, veins, cracks, drips and tints with a progress sequence',
+    uses: ['Full-screen HUD overlays that show player damage in shooters and horror games, faded in or played as a frame sequence as health drops.', 'Status-effect screens such as poison, burning or freezing overlays.'],
+    tags: ['Horror', 'VFX', 'Shooter'],
     aspect: '16:9',
     normalMap: false, // a screen overlay, not a surface
     icon: U.icon('<rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M3.5 10c2.5 0 3.5-2 4-5.5M20.5 14c-2.5 0-3.5 2-4 5.5" opacity=".6"/><path d="M11 4.5v4M14.5 4.5v2.2"/><circle cx="11" cy="9.6" r=".9"/>'),
-    exportLayers: (p) => (p.split ? [{ id: 'color', suffix: 'color' }, { id: 'flow', suffix: 'flow' }] : null),
+    // frame sequence: one PNG per frame, numbered _f00, _f01 … in progress order
+    exportLayers: (p) => (p.frames ? Array.from({ length: Math.max(2, p.frameCount | 0) }, (_, i) => ({ id: 'frame' + i, suffix: 'f' + String(i).padStart(2, '0') })) : null),
     params: [
       { type: 'section', label: 'Damage' },
-      { key: 'pulse', label: 'Damage intensity', type: 'range', min: 0, max: 1, step: 0.01, default: 1, tip: 'Scales every layer (reach, opacity, blood). Export several values for low → high damage frames. Ignored for the alpha flow and the separate export (always full damage)' },
+      { key: 'pulse', label: 'Damage progress', type: 'range', min: 0, max: 1, step: 0.01, default: 1, tip: 'Grows every layer between its own Start and End (set per layer). 1 = full damage. The frame sequence export ignores this and bakes the whole progression' },
       { key: 'opacity', label: 'Master opacity', type: 'range', min: 0, max: 1, step: 0.01, default: 1 },
       { key: 'seed', label: 'Seed', type: 'seed', default: 7 },
 
@@ -91,18 +102,18 @@
       { type: 'section', label: 'Layers (bottom → top)' },
       {
         key: 'layers', label: 'Layers', type: 'list', itemLabel: 'Layer', max: 12,
-        itemSummary: (l) => `${l.on === false ? '(hidden) ' : ''}${tr(TYPE_NAME[l.type] || l.type)} · ${l.blend} · ${Math.round(l.opacity * 100)}%`,
+        itemSummary: (l) => `${l.on === false ? '(hidden) ' : ''}${tr(TYPE_NAME[l.type] || l.type)} · ${l.blend} · ${Math.round(l.opacity * 100)}% · ${(+(l.tStart ?? 0)).toFixed(2)}→${(+(l.tEnd ?? 1)).toFixed(2)}`,
         default: U.clone ? U.clone(DEFAULT_LAYERS) : JSON.parse(JSON.stringify(DEFAULT_LAYERS)),
         item: LAYER_DEFS,
       },
 
       { type: 'section', label: 'Output' },
-      { key: 'flow', label: 'Alpha', type: 'select', default: 'normal', options: [['normal', 'Normal overlay'], ['flow', 'Alpha flow baked']], tip: 'Alpha flow: alpha = how early a pixel appears (1 at the screen edge → 0 innermost, following the noisy edge) × coverage; color is the full-damage look. In the shader: visible where alpha > 1 - damage, e.g. a = smoothstep(1 - damage - 0.05, 1 - damage + 0.05, tex.a), so the damage creeps in from the edges' },
-      { key: 'flowCurve', label: 'Flow curve', type: 'range', min: 0.25, max: 4, step: 0.01, default: 1, show: (p) => p.flow === 'flow' || p.split, tip: '< 1: the damage rushes in early, > 1: it lingers at the edges and reaches the center late' },
-      { key: 'flowNoise', label: 'Front irregularity', type: 'range', min: 0, max: 1, step: 0.01, default: 0.35, show: (p) => p.flow === 'flow' || p.split, tip: 'Extra noise on the creeping front (on top of the layers\' own edge breakup)' },
       { key: 'dither', label: 'Dither (no banding)', type: 'bool', default: true },
-      { key: 'split', label: 'Separate layer export', type: 'bool', default: false, tip: 'Download the color overlay and a grayscale flow map (white = edge, appears first … black = center / never) as separate, aligned PNGs, both at full damage' },
-      { key: 'view', label: 'Preview layer', type: 'select', default: 'all', show: (p) => p.split, options: [['all', 'Everything (combined)'], ['color', 'Color overlay'], ['flow', 'Flow map']], tip: 'Preview only, the export uses the settings above' },
+      { key: 'frames', label: 'Export frame sequence', type: 'bool', default: false, tip: 'Download N aligned PNGs (_f00, _f01 …) from first damage to full damage, to flip through in the engine' },
+      { key: 'frameCount', label: 'Frames', type: 'int', min: 2, max: 64, default: 16, show: (p) => p.frames },
+      { key: 'frameFirst', label: 'First frame progress', type: 'range', min: 0, max: 0.9, step: 0.01, default: 0.05, show: (p) => p.frames, tip: 'Damage progress of the first frame (0 = empty frame); the last frame is always full damage' },
+      { key: 'frameCurve', label: 'Frame spacing', type: 'range', min: 0.3, max: 3, step: 0.01, default: 1, show: (p) => p.frames, tip: '1 = even steps; > 1 = more frames early in the progression (fine detail as the damage starts), < 1 = more frames near full damage' },
+      { key: 'previewFrame', label: 'Preview frame', type: 'int', min: 0, max: 64, default: 0, show: (p) => p.frames, tip: 'Preview only: 0 = use Damage progress, otherwise shows that frame of the sequence' },
     ],
     presets: [
       // Realistic
@@ -123,17 +134,17 @@
       { name: 'Frozen', group: 'Elemental', values: { seed: 23, shape: 'rect', roundness: 0.7, layers: [V({ reach: 0.55, falloff: 1.4, opacity: 0.85, color: '#d8f2ff', color2: '#3a7fb8', breakup: 0.7, breakStyle: 'crystals', breakScale: 7 }), CRACK({ reach: 0.77, scale: 5, width: 0.35, color: '#ffffff', opacity: 0.8 })] } },
       { name: 'Electric / EMP', group: 'Elemental', values: { seed: 42, layers: [V({ reach: 0.5, falloff: 1.6, opacity: 0.85, color: '#38c8ff', color2: '#06103a', colorBias: 0.6, breakup: 0.5, breakStyle: 'tendrils', breakScale: 6 }), VEIN({ reach: 0.85, scale: 3, width: 0.12, color: '#e0fbff', opacity: 1, blend: 'screen' }), TINT({ color: '#40c0ff', opacity: 0.06, blend: 'screen' })] } },
       { name: 'Radiation', group: 'Elemental', values: { seed: 52, shape: 'rect', roundness: 1, layers: [V({ reach: 0.6, softness: 0.7, falloff: 1.2, opacity: 0.85, color: '#d8ff3a', color2: '#2a3a00', colorBias: 0.8, breakup: 0.55, breakStyle: 'crystals', breakScale: 10 }), DROP({ amount: 0.7, size: 0.5, reach: 0.75, color: '#eaff70', color2: '#9ad000', opacity: 0.9, blend: 'screen' })] } },
-      // Engine-ready: alpha flow baked for a creeping-in shader effect
-      { name: 'Creeping blood (alpha flow)', group: 'Engine-ready', values: { seed: 12, flow: 'flow', flowNoise: 0.45, layers: [V({ reach: 0.75, falloff: 1.2, breakup: 0.65, breakScale: 3.5 }), VEIN({ reach: 1.1, opacity: 0.45 }), SPL({ amount: 0.7, size: 1.2, reach: 0.8 }), DROP({ amount: 0.5, reach: 0.8 })] } },
-      { name: 'Creeping frost (split export)', group: 'Engine-ready', values: { seed: 23, shape: 'rect', roundness: 0.7, flowNoise: 0.5, split: true, layers: [V({ reach: 0.8, falloff: 1.2, opacity: 0.9, color: '#d8f2ff', color2: '#3a7fb8', breakup: 0.75, breakStyle: 'crystals', breakScale: 7 }), CRACK({ reach: 1, scale: 5, width: 0.35, color: '#ffffff', opacity: 0.8 })] } },
+      // Engine-ready: frame sequences of the damage growing in
+      { name: 'Creeping blood (16 frames)', group: 'Engine-ready', values: { seed: 12, frames: true, frameCount: 16, layers: [V({ reach: 0.75, falloff: 1.2, breakup: 0.65, breakScale: 3.5 }), VEIN({ reach: 1.1, opacity: 0.45 }), SPL({ amount: 0.7, size: 1.2, reach: 0.8 }), DROP({ amount: 0.5, reach: 0.8 }), DRIP({ amount: 0.25, length: 0.45 })] } },
+      { name: 'Veins first, blood later (24 frames)', group: 'Engine-ready', values: { seed: 66, frames: true, frameCount: 24, frameCurve: 1.3, layers: [V({ reach: 0.65, falloff: 1.6, color: '#5a0010', color2: '#120004', breakup: 0.55, breakStyle: 'tendrils', tStart: 0.25, tEnd: 1 }), VEIN({ reach: 1.1, scale: 5, width: 0.5, color: '#220006', opacity: 0.85, tStart: 0, tEnd: 0.35 }), SPL({ amount: 0.5, reach: 0.5, tStart: 0.45, tEnd: 0.9 }), DROP({ amount: 0.4, reach: 0.5, tStart: 0.4, tEnd: 0.85 })] } },
+      { name: 'Creeping frost (12 frames)', group: 'Engine-ready', values: { seed: 23, shape: 'rect', roundness: 0.7, frames: true, frameCount: 12, layers: [V({ reach: 0.8, falloff: 1.2, opacity: 0.9, color: '#d8f2ff', color2: '#3a7fb8', breakup: 0.75, breakStyle: 'crystals', breakScale: 7 }), CRACK({ reach: 1, scale: 5, width: 0.35, color: '#ffffff', opacity: 0.8 })] } },
     ],
     render(ctx, W, H, p, opts) {
       opts = opts || {};
-      const view = opts.layer || (opts.preview && p.split ? p.view || 'all' : 'all');
-      const flowMode = p.flow === 'flow';
-      // flow output and separate layers always show the full-damage look
-      const pulse = flowMode || view !== 'all' ? 1 : clamp(p.pulse);
-      const needFlow = view === 'flow' || (view === 'all' && flowMode);
+      // damage progress: a frame of the sequence export, the preview frame, or the slider
+      const fm = typeof opts.layer === 'string' && /^frame(\d+)$/.exec(opts.layer);
+      const pf = opts.preview && p.frames && p.previewFrame > 0 ? Math.min(p.previewFrame, Math.max(2, p.frameCount | 0)) - 1 : -1;
+      const pulse = fm ? frameT(p, +fm[1]) : pf >= 0 ? frameT(p, pf) : clamp(p.pulse);
       const S = Math.min(W, H), seed = p.seed | 0;
       const ax = W / S, ay = H / S; // half extents (short side spans -1..1)
 
@@ -232,9 +243,15 @@
       /* ---------- blood: metaballs splatted into a density grid ---------- */
       const K = 1 / 0.5625;
       const sideW = p.shape === 'sides' ? [p.left, p.right, p.top, p.bottom] : [1, 1, 1, 1];
-      const bloodGrid = (l, s) => {
-        const G = new Float32Array(N), rnd = U.rng(s * 7 + 3), bs = l.size;
+      // g = growth of this layer (0..1). Blobs, droplets and drips each get a birth time from their own
+      // random stream (the layout itself never changes with g) and swell in from there: a ball's weight
+      // scales its density, so a young blob only shows its core and spreads as it fills up
+      const bloodGrid = (l, s, g) => {
+        const G = new Float32Array(N), rnd = U.rng(s * 7 + 3), born = U.rng(s * 13 + 5), bs = l.size;
+        let wt = 1;
+        const grow = (span, ramp) => { const b = born() * span; wt = g >= 1 ? 1 : smoothstep(b, b + ramp, g); return wt; };
         const ball = (bu, bv, r) => {
+          if (wt <= 0) return;
           r = Math.max(r, du * 0.8);
           const R = 2 * r, R2 = R * R, ci = W / st / 2, cj = H / st / 2;
           const i0 = Math.max(0, Math.floor((bu - R) / du + ci)), i1 = Math.min(gw - 1, Math.ceil((bu + R) / du + ci));
@@ -243,7 +260,7 @@
             const dv = vOf(j) - bv;
             for (let i = i0; i <= i1; i++) {
               const dd = uOf(i) - bu, q = 1 - (dd * dd + dv * dv) / R2;
-              if (q > 0) G[j * gw + i] += K * q * q;
+              if (q > 0) G[j * gw + i] += K * q * q * wt;
             }
           }
         };
@@ -266,6 +283,7 @@
           for (let b = 0; b < n; b++) {
             const [cx, cy, inA] = edgePt(Math.pow(rnd(), 1.6) * spreadD - 0.03);
             const r = bs * 0.06 * (0.45 + rnd() * rnd() * 1.2);
+            grow(0.6, 0.4); // blobs land one after another, then spread
             ball(cx, cy, r);
             for (let k = 0; k < 6; k++) { const a = rnd() * TAU, d = r * (0.4 + rnd() * 0.6); ball(cx + Math.cos(a) * d, cy + Math.sin(a) * d, r * (0.35 + rnd() * 0.4)); }
             const spikes = 2 + Math.floor(rnd() * 5);
@@ -278,18 +296,24 @@
           }
         } else if (l.type === 'droplets') {
           const n = Math.round(l.amount * 260);
-          for (let k = 0; k < n; k++) { const [x, y] = edgePt(Math.pow(rnd(), 1.3) * spreadD * 1.3); ball(x, y, bs * 0.011 * (0.35 + rnd() * rnd() * 1.6)); }
+          for (let k = 0; k < n; k++) { const [x, y] = edgePt(Math.pow(rnd(), 1.3) * spreadD * 1.3); grow(0.8, 0.2); ball(x, y, bs * 0.011 * (0.35 + rnd() * rnd() * 1.6)); }
         } else {
           // drips from the top edge: a wobbling, slightly thinning trail with a bulb at the end
           const n = Math.round(l.amount * 24);
           for (let k = 0; k < n; k++) {
             const x0 = (rnd() * 2 - 1) * ax * 0.95, L = l.length * 2 * ay * (0.25 + 0.75 * rnd());
             const w = bs * 0.014 * (0.6 + rnd() * 0.7), ph = rnd() * TAU, wob = w * (0.3 + rnd());
-            ball(x0, -ay, w * 2.6);
-            ball(x0 + (rnd() - 0.5) * w * 3, -ay + w * 1.5, w * 1.8);
-            const steps = Math.max(2, Math.ceil(L / (w * 0.6)));
-            for (let q = 0; q <= steps; q++) { const t = q / steps; ball(x0 + Math.sin(ph + t * 7) * wob * t, -ay + L * t, w * (1 - 0.3 * t)); }
-            ball(x0 + Math.sin(ph + 7) * wob, -ay + L + w * 0.6, w * 1.45);
+            const jx = (rnd() - 0.5) * w * 3;
+            // each drip starts at its own time and runs down: the trail is drawn as far as it has got
+            const b0 = born() * 0.45, run = g >= 1 ? 1 : clamp((g - b0) / (1 - b0));
+            if (run <= 0) continue;
+            wt = 1;
+            const sw = Math.min(1, run * 5); // the source blob at the edge fills first
+            ball(x0, -ay, w * 2.6 * sw);
+            ball(x0 + jx, -ay + w * 1.5, w * 1.8 * sw);
+            const steps = Math.max(2, Math.ceil(L / (w * 0.6))), tip = Math.pow(run, 0.8);
+            for (let q = 0; q <= steps; q++) { const t = q / steps; if (t > tip) break; ball(x0 + Math.sin(ph + t * 7) * wob * t, -ay + L * t, w * (1 - 0.3 * t)); }
+            ball(x0 + Math.sin(ph + tip * 7) * wob * tip, -ay + L * tip + w * 0.6, w * (1 + 0.45 * tip));
           }
         }
         // irregular edges: perturb the density where it is near the threshold
@@ -305,13 +329,15 @@
 
       /* ---------- per-layer setup ---------- */
       const BL_CODE = { normal: 0, multiply: 1, screen: 2, add: 3 };
-      const aK = Math.pow(pulse, 0.6);
-      let flowR = null, flowReach = -1;
       const L = layers.map((l, idx) => {
         const s = seed + (l.seed | 0) * 7919 + idx * 101;
+        // growth of this layer inside its timing window
+        const [t0, t1] = timeWindow(l), g = pulse >= 1 ? 1 : clamp((pulse - t0) / (t1 - t0)), aK = Math.pow(g, 0.6);
         const o = { t: l.type, blend: BL_CODE[l.blend] | 0, c1: U.hex(l.color), c2: U.hex(l.color2) };
+        if (g <= 0) return null;
         if (l.type === 'vignette') {
-          const reach = l.reach * (0.4 + 0.6 * pulse), rs = 1 - reach, fadeW = Math.max(1e-3, reach * l.softness);
+          // creeps in from the screen edge
+          const reach = l.reach * (0.15 + 0.85 * g), rs = 1 - reach, fadeW = Math.max(1e-3, reach * l.softness);
           const bAmt = l.breakup * reach * 0.6;
           let G = baseGrid(l.shape);
           if (bAmt > 0) {
@@ -328,35 +354,22 @@
             for (let c = 0; c < 3; c++) LC[k * 3 + c] = o.c1[c] + (o.c2[c] - o.c1[c]) * ct;
           }
           Object.assign(o, { G, rs, span, NL, LA, LC });
-          if (l.reach > flowReach) { flowReach = l.reach; flowR = G; } // the deepest vignette drives the flow
         } else if (l.type === 'veins' || l.type === 'cracks') {
-          const reach = l.reach * (0.4 + 0.6 * pulse), lo = 1 - reach, R = baseGrid(l.shape), cracks = l.type === 'cracks';
+          // lines grow inward from the edge, tapering at their front
+          const reach = l.reach * g, lo = 1 - reach, R = baseGrid(l.shape), cracks = l.type === 'cracks';
           const GV = half(R, (r) => r > lo - 0.08, (u, v) => lineAt(cracks, l.scale, s, u, v));
-          Object.assign(o, { R, GV, lo, vw: l.width * 0.1, a: l.opacity * Math.min(1, pulse * 1.4) });
+          Object.assign(o, { R, GV, lo, vw: l.width * 0.1, a: l.opacity * Math.min(1, g * 2.5) });
         } else if (l.type === 'tint') {
           o.a = l.opacity * aK;
         } else {
-          Object.assign(o, { GB: bloodGrid(l, s), thr: 1 + (1 - pulse) * 1.6, a: l.opacity * Math.min(1, 0.3 + pulse) });
+          Object.assign(o, { GB: bloodGrid(l, s, g), thr: 1 + (1 - g) * 0.5, a: l.opacity * Math.min(1, 0.4 + g) });
         }
         return o;
-      });
-
-      // flow metric: the deepest vignette's noisy r (or the plain global shape) plus extra front noise
-      let GF = null;
-      if (needFlow) {
-        const R = flowR || baseGrid('global');
-        GF = new Float32Array(N);
-        if (p.flowNoise > 0) {
-          const nz = half(R, () => true, (u, v) => U.fractal('perlin', u * 3, v * 3, 0, 0, 4, 0.5, 'fbm', seed + 77) - 0.5);
-          for (let k = 0; k < N; k++) GF[k] = R[k] + nz[k] * p.flowNoise * 0.8;
-        } else GF.set(R);
-      }
+      }).filter(Boolean);
 
       /* ---------- per-pixel composite (premultiplied accumulator, W3C-style blend modes) ---------- */
       const L2 = (G, o, tx, ty) => { const a = G[o] + (G[o + 1] - G[o]) * tx, b = G[o + gw] + (G[o + gw + 1] - G[o + gw]) * tx; return a + (b - a) * ty; };
       const img = ctx.createImageData(W, H), d = img.data;
-      const cov = needFlow ? new Float32Array(W * H) : null, fr = needFlow ? new Float32Array(W * H) : null;
-      let rMin = Infinity;
       const P = [0, 0, 0]; // premultiplied color 0..255
       const master = p.opacity, nL = L.length;
       for (let y = 0; y < H; y++) {
@@ -404,35 +417,11 @@
           const i4 = (y * W + x) * 4;
           if (A > 0) { const ia = 1 / A; d[i4] = P[0] * ia; d[i4 + 1] = P[1] * ia; d[i4 + 2] = P[2] * ia; }
           A *= master;
-          if (needFlow) {
-            const j = y * W + x, r = L2(GF, o, tx, ty);
-            cov[j] = A; fr[j] = r;
-            if (A > 0.02 && r < rMin) rMin = r;
-          } else {
-            if (p.dither && A > 0 && A < 1) A += (U.hash(x, y, 91) - 0.5) / 255;
-            d[i4 + 3] = clamp(A) * 255;
-          }
+          if (p.dither && A > 0 && A < 1) A += (U.hash(x, y, 91) - 0.5) / 255;
+          d[i4 + 3] = clamp(A) * 255;
         }
       }
 
-      /* ---------- flow: 1 at the screen edge → 0 at the innermost covered pixel ---------- */
-      if (needFlow) {
-        if (!isFinite(rMin)) rMin = 0;
-        rMin = Math.min(rMin, 0.98);
-        const k = 1 / (1 - rMin), map = view === 'flow';
-        for (let j = 0; j < W * H; j++) {
-          const c = cov[j], i4 = j * 4;
-          let f = Math.pow(clamp((fr[j] - rMin) * k), p.flowCurve);
-          if (map) {
-            // grayscale, opaque: black where the effect never reaches
-            const g = c > 0 ? Math.max(f, 1 / 255) * smoothstep(0, 0.03, c) * 255 : 0;
-            d[i4] = d[i4 + 1] = d[i4 + 2] = g; d[i4 + 3] = 255;
-          } else {
-            f = c > 0 ? Math.max(f, 1 / 255) * c : 0;
-            d[i4 + 3] = clamp(f) * 255;
-          }
-        }
-      }
       ctx.putImageData(img, 0, 0);
     },
   });

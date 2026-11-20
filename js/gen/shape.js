@@ -15,8 +15,9 @@
 
   U.register({
     id: 'shape',
-    name: 'Shape',
-    desc: 'Rects, circles, ellipses, polygons, stars, rings, arrows',
+    name: 'Simple Shape',
+    desc: 'Rectangles, ellipses, polygons, stars, rings, crosses and arrows with gradient fill, outline and edge blur',
+    uses: ['Quick UI icons, badges, soft masks and contact shadows for games and apps.', 'Blockout sprites and placeholder art during prototyping.'],
     tags: ['UI', 'VFX'],
     icon: U.icon('<rect x="3.5" y="11" width="9" height="9" rx="1"/><circle cx="16" cy="8" r="4.5"/>'),
     params: [

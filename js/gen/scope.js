@@ -50,8 +50,9 @@
   U.register({
     id: 'scope',
     name: 'Scope',
-    desc: 'Scope overlay: reticle presets, lens mask, housing ring',
-    tags: ['UI', 'Shooter'],
+    desc: 'Scope overlays with modular reticles, lens mask and housing ring, exportable as separate layers',
+    uses: ['Full-screen scoped-view overlays for sniper rifles and optics in shooters, with illuminated reticle parts on an emissive layer.', 'Binocular and camera viewfinder overlays for cutscenes and photo modes.'],
+    tags: ['UI', 'Shooter', 'Military'],
     bg: 'gray',
     exportLayers: (p) => (p.split ? (p.reticleOnly ? [] : [{ id: 'lens', suffix: 'lens' }]).concat([{ id: 'reticle', suffix: 'reticle' }, { id: 'emissive', suffix: 'emissive' }]) : null),
     icon: U.icon('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v6M12 14.5v6M3.5 12h6M14.5 12h6"/><circle cx="12" cy="12" r=".8" fill="currentColor"/>'),

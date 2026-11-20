@@ -12,7 +12,8 @@
   U.register({
     id: 'lightCone',
     name: 'Light Cone',
-    desc: 'Emissive light shape of a lamp on a nearby surface: inner / outer cone, softness, falloff',
+    desc: 'Emissive light shapes cast by lamps on nearby surfaces, with inner and outer cone, softness and falloff',
+    uses: ['Fake-light textures for walls and ceilings in games, e.g. the glow of a desk lamp or sconce, tinted in the engine instead of using a real light.', 'Lighting overlays for 2D scenes and concept art.'],
     tags: ['Lighting', 'VFX'],
     bg: 'black',
     icon: U.icon('<path d="M9 3h6l-1 3h-4z"/><path d="M10 6L4 21h16L14 6"/>'),

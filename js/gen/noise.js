@@ -7,7 +7,8 @@
   U.register({
     id: 'noise',
     name: 'Noise',
-    desc: 'Tileable Perlin, value, Worley noise with fBm octaves',
+    desc: 'Tileable Perlin, value, Worley and cellular noise with fBm, ridged and turbulence modes',
+    uses: ['Base noise textures for shaders, masks and height maps, e.g. clouds, terrain, caustics or dissolve effects.', 'Film grain and abstract backgrounds for graphic design.'],
     tags: ['Texturing', 'VFX'],
     tileable: true,
     icon: U.icon('<path d="M3 15c2-4 4-4 6 0s4 4 6 0 4-4 6 0"/><path d="M3 9c2-4 4-4 6 0s4 4 6 0 4-4 6 0" opacity=".5"/>'),

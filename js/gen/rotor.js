@@ -12,8 +12,9 @@
   U.register({
     id: 'rotor',
     name: 'Rotor Blur',
-    desc: 'Spinning helicopter / propeller blades with motion blur',
-    tags: ['VFX', 'Vehicles'],
+    desc: 'Motion-blurred helicopter, propeller and fan blades, from a crisp leading edge to a translucent disc',
+    uses: ['Spinning rotor and propeller discs for helicopters, aircraft and drones, swapped in for the blade mesh at high speed.', 'Spinning fan and turbine sprites for 2D games and animations.'],
+    tags: ['VFX', 'Vehicles', 'Military'],
     bg: 'gray',
     icon: U.icon('<circle cx="12" cy="12" r="1.8"/><path d="M12 12L21 9.5M12 12L3 14.5"/><path d="M20.5 6.5A9 9 0 0 1 21 12M3.5 17.5A9 9 0 0 1 3 12" opacity=".5"/>'),
     params: [

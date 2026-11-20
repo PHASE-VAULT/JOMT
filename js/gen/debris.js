@@ -263,7 +263,8 @@
   U.register({
     id: 'debris',
     name: 'Debris & Shattered Glass',
-    desc: 'Ground decal of scattered glass shards, stones, rubble, wood splinters or tile shards; never touches the edge',
+    desc: 'Ground decals of scattered glass shards, rubble, pebbles, wood splinters or tile shards with height map',
+    uses: ['Floor decals under broken windows, destroyed walls or smashed props in 3D levels, laid on a quad with the height output feeding the normal map.', 'Top-down ground clutter for 2D and isometric games.'],
     tags: ['Texturing', 'Decals'],
     heightMap: true,
     icon: U.icon('<polygon points="4,15 9,11 11,17"/><polygon points="13,6 18,9 14,12"/><polygon points="14,15 20,14 18,19"/>'),

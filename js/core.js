@@ -12,7 +12,7 @@
   };
   U.getGen = (id) => U.generators.find((g) => g.id === id);
   // filter tags, in display order; each generator lists up to 3 of them in `tags`
-  U.TAGS = ['Texturing', 'UI', 'Shooter', 'VFX', 'Lighting', 'Nature', 'Decals', 'Vehicles', 'Sci-fi'];
+  U.TAGS = ['Horror', 'Texturing', 'UI', 'Shooter', 'Military', 'VFX', 'Lighting', 'Nature', 'Decals', 'Vehicles', 'Sci-fi'];
 
   /* ---------- math ---------- */
   const clamp = (v, a = 0, b = 1) => (v < a ? a : v > b ? b : v);

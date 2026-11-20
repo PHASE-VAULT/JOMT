@@ -47,7 +47,8 @@
   U.register({
     id: 'flowfield',
     name: 'Flowfield',
-    desc: 'Grid of shapes rotated, offset and scaled by a tileable noise flow',
+    desc: 'Tileable grids of shapes rotated, offset and scaled by a noise flow, from strokes and dashes to scales',
+    uses: ['Directional detail textures such as fur, grass tufts, brushed metal, fish scales or rain streaks for materials and stylized surfaces.', 'Generative op-art backgrounds and motion-graphics patterns.'],
     tags: ['Texturing', 'Sci-fi'],
     tileable: true,
     icon: U.icon('<path d="M4 6l3-1M10 5l3 1M17 7l3 2"/><path d="M4 12l3-2M10 11l3 0M16 12l3 2"/><path d="M4 18l3-3M10 17l3-2M16 17l3 1"/>'),

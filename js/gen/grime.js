@@ -7,7 +7,8 @@
   U.register({
     id: 'grime',
     name: 'Grime / Grunge',
-    desc: 'Tileable dirt, stains, speckles and drip streaks',
+    desc: 'Tileable dirt, stains, speckles and drip streaks as transparent overlay, grayscale mask or dirt over color',
+    uses: ['Grunge masks and dirt overlays for weathering materials in texturing tools and shader blends, e.g. dusty concrete, soot or rust bleed.', 'Distressed overlays for UI panels, posters and photo edits.'],
     tags: ['Texturing', 'Decals'],
     normalMap: false, // a dirt overlay / mask, not a surface: no normal map mode
     tileable: true,

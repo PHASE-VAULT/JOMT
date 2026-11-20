@@ -152,7 +152,8 @@
   U.register({
     id: 'particle',
     name: 'Particle',
-    desc: 'Layered particle designer: smoke, fire, magic, sparks, bubbles',
+    desc: 'Layered particle sprites for smoke, fire, sparks, magic and bubbles, with blend modes and flipbook animation',
+    uses: ['Particle textures and flipbooks for game VFX systems, e.g. smoke puffs, campfires, explosions and spell bursts.', 'Single glow and sparkle elements for UI effects and motion graphics.'],
     tags: ['VFX'],
     bg: 'black',
     icon: U.icon('<path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><circle cx="12" cy="12" r="2.5"/><path d="M6.5 6.5l2 2M15.5 15.5l2 2M17.5 6.5l-2 2M8.5 15.5l-2 2" opacity=".55"/>'),

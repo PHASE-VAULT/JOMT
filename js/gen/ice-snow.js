@@ -39,7 +39,8 @@
   U.register({
     id: 'ice-snow',
     name: 'Ice / Snow',
-    desc: 'Tileable snow and ice: fresh, packed, wind-swept and slushy snow, lake ice with cracks and bubbles, glacier ice, frost and hoarfrost, with height map',
+    desc: 'Tileable snow and ice from fresh powder and slush to cracked lake ice, glacier and frost, with height map',
+    uses: ['Winter ground, frozen lake and glacier materials for 3D terrain, using the height map for drifts, cracks and frost relief.', 'Frosted-glass textures for windows and cold screen effects.'],
     tags: ['Texturing', 'Nature'],
     tileable: true,
     heightMap: true,
@@ -84,7 +85,7 @@
       { key: 'crystals', label: 'Frost crystals', type: 'range', min: 0, max: 1, step: 0.01, default: BASE.crystals, tip: 'Branching, fern-like ice crystals' },
       { key: 'crystalSize', label: 'Crystal size', type: 'range', min: 0.3, max: 2, step: 0.05, default: 1, show: (p) => p.crystals > 0 },
 
-      { type: 'section', label: 'Colors' },
+      { type: 'section', label: 'Color' },
       { key: 'snowColor', label: 'Snow', type: 'color', default: BASE.snowColor, tip: 'Also used for frost and frosty highlights' },
       { key: 'shadowColor', label: 'Shadow tint', type: 'color', default: BASE.shadowColor },
       { key: 'iceColor', label: 'Ice', type: 'color', default: BASE.iceColor, tip: 'Ice near the surface' },

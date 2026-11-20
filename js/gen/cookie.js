@@ -88,7 +88,8 @@
   U.register({
     id: 'cookie',
     name: 'Spotlight Cookie',
-    desc: 'Layered rings and discs with falloff and noise for light cookies',
+    desc: 'Light cookies from layered rings, discs and scanner shapes with radial falloff, streak noise and scanlines',
+    uses: ['Projector cookies for spotlights and flashlights in game engines, giving torches, headlights and stage lights a believable beam pattern.', 'Holographic scanner and targeting overlays for sci-fi HUDs and projection effects.'],
     tags: ['Lighting', 'Shooter'],
     bg: 'black',
     icon: U.icon('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5.5"/><circle cx="12" cy="12" r="2"/>'),

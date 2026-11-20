@@ -266,8 +266,9 @@
   U.register({
     id: 'symbol',
     name: 'Geometric Symbol',
-    desc: 'Geometric symbols, sigils and cult emblems from rings, polygrams, eyes, crescents …, with a randomizer and wear',
-    tags: ['UI', 'Decals'],
+    desc: 'Geometric sigils, emblems and cult symbols from rings, polygrams, eyes and crescents, with symmetry and wear',
+    uses: ['Ritual circles, cult markings and faction emblems for horror, fantasy and sci-fi games, used as wall and floor decals or on props.', 'Logos, tattoo designs and esoteric illustrations.'],
+    tags: ['Horror', 'UI', 'Decals'],
     bg: 'gray',
     icon: U.icon('<circle cx="12" cy="12" r="9"/><polygon points="12,4.5 18.5,16 5.5,16"/><circle cx="12" cy="12.4" r="1.6" fill="currentColor"/>'),
     params: [

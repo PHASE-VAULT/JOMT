@@ -17,7 +17,8 @@
   U.register({
     id: 'plaster',
     name: 'Plaster & Concrete',
-    desc: 'Tileable plaster, stucco and concrete: mottling, pores, aggregate, trowel marks, formwork, cracks, stains and chipping',
+    desc: 'Tileable plaster, stucco and concrete with pores, trowel marks, formwork, cracks, stains and height map',
+    uses: ['Wall and floor materials for interiors, bunkers and building facades, with a height map for the normal map mode.', 'Subtly textured backgrounds for UI and print layouts.'],
     tags: ['Texturing'],
     tileable: true,
     heightMap: true,

@@ -6,8 +6,9 @@
   U.register({
     id: 'flashFront',
     name: 'Muzzle Flash (front)',
-    desc: 'Noisy star-shaped flash seen from the front, anamorphic stretch',
-    tags: ['VFX', 'Shooter'],
+    desc: 'Front-view muzzle flashes with a star of noisy prongs, hot core, anamorphic stretch and streak',
+    uses: ['Muzzle flash sprites seen down the barrel in shooters, shown for a frame or two on each shot.', 'Explosion bursts and impact flashes in arcade and comic-style games.'],
+    tags: ['VFX', 'Shooter', 'Military'],
     bg: 'black',
     icon: U.icon('<path d="M12 2l1.8 6.5L20 6l-4.2 5L22 13l-6.5 1.5L17 21l-5-4.5L7 21l1.5-6.5L2 13l6.2-2L4 6l6.2 2.5z"/>'),
     params: [

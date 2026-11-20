@@ -24,6 +24,10 @@
   const hasNormal = (gen) => !!gen && (gen.normalMap === true || (gen.normalMap !== false && (gen.tags || []).includes('Texturing')));
   const normalOn = (tab) => !!(tab && tab.normal && tab.normal.on && hasNormal(U.getGen(tab.type)));
   const newNormal = (gen, src) => ({ on: src ? !!src.on : false, params: Object.assign(U.normalDefaults(gen), src && src.params) });
+  /* smoothness / roughness map mode (js/smooth.js): Texturing and Decals generators */
+  const smoothOn = (tab) => !!(tab && tab.smooth && tab.smooth.on && U.hasSmooth(U.getGen(tab.type)));
+  const newSmooth = (gen, src) => ({ on: src ? !!src.on : false, params: Object.assign(U.smoothDefaults(gen), src && src.params) });
+  const derivedOn = (tab) => normalOn(tab) || smoothOn(tab); // a map derived from the texture is shown
   /* tilesheet mode: generators with an animate() hook render an N×N animation sheet */
   const hasSheet = (gen) => !!gen && typeof gen.animate === 'function';
   const sheetOn = (tab) => !!(tab && tab.sheet && tab.sheet.on && hasSheet(U.getGen(tab.type)));
@@ -50,7 +54,8 @@
   /* ---------- tabs ---------- */
   function createTab(type, src) {
     const gen = U.getGen(type);
-    const n = S.tabs.filter((t) => t.type === type).length + 1;
+    // next free number for this type (counting tabs would reuse a number after closing one)
+    const n = S.tabs.reduce((m, t) => (t.type === type ? Math.max(m, t.num || 0) : m), 0) + 1;
     const tab = {
       id: nextId++,
       type,
@@ -63,6 +68,7 @@
       // name of the applied preset until a setting changes; a fresh tab starts on Default
       preset: src ? src.preset : gen.presets ? 'Default' : null,
       normal: newNormal(gen, src && src.normal),
+      smooth: newSmooth(gen, src && U.clone(src.smooth)),
       sheet: newSheet(src && U.clone(src.sheet)),
     };
     S.tabs.splice(src ? S.tabs.indexOf(src) + 1 : S.tabs.length, 0, tab);
@@ -82,7 +88,7 @@
      Changes that follow each other within BURST_MS (e.g. one slider drag) become a single step. */
   const HISTORY_MAX = 100, BURST_MS = 600;
   const history = new Map(); // tab id -> { undo: [], redo: [], last: string, burst: timer }
-  const snap = (tab) => JSON.stringify({ params: tab.params, aspect: tab.aspect, normal: tab.normal && tab.normal.params, sheet: tab.sheet && { ...tab.sheet, on: undefined } });
+  const snap = (tab) => JSON.stringify({ params: tab.params, aspect: tab.aspect, normal: tab.normal && tab.normal.params, smooth: tab.smooth && tab.smooth.params, sheet: tab.sheet && { ...tab.sheet, on: undefined } });
   const hist = (tab) => {
     let h = history.get(tab.id);
     if (!h) { h = { undo: [], redo: [], last: snap(tab), burst: 0 }; history.set(tab.id, h); }
@@ -116,6 +122,7 @@
     tab.params = st.params;
     tab.aspect = st.aspect;
     if (st.normal && tab.normal) tab.normal.params = st.normal;
+    if (st.smooth && tab.smooth) tab.smooth.params = st.smooth;
     if (st.sheet && tab.sheet) tab.sheet = Object.assign(st.sheet, { on: tab.sheet.on }); // undo never flips the mode
     h.last = snap(tab);
     tab.dirty = true;
@@ -223,14 +230,29 @@
   /* ---------- panel ---------- */
   let panelKey = '';
   function buildPanel() {
-    const tab = cur(), gen = U.getGen(tab.type), nm = normalOn(tab), sm = sheetOn(tab);
+    const tab = cur(), gen = U.getGen(tab.type), nm = normalOn(tab), sm = sheetOn(tab), sg = smoothOn(tab);
     if (!tab.normal) tab.normal = newNormal(gen);
+    if (!tab.smooth) tab.smooth = newSmooth(gen);
     if (!tab.sheet) tab.sheet = newSheet();
-    $('#genName').textContent = U.t(gen.name) + (nm ? ' · ' + U.t('Normal map') : sm ? ' · ' + U.t('Tilesheet') : '');
-    $('#genDesc').textContent = nm
-      ? U.t(gen.normalDesc || 'Normal map derived from the texture: its brightness (or a channel) is used as height')
-      : sm ? sheetDesc(tab)
-      : U.t(gen.desc) + (gen.tileable ? ' · ' + U.t('tileable') : '');
+    $('#genName').textContent = U.t(gen.name) + (nm ? ' · ' + U.t('Normal map') : sg ? ' · ' + U.t(tab.smooth.params.roughness ? 'Roughness' : 'Smoothness') : sm ? ' · ' + U.t('Tilesheet') : '');
+    // the header explains the generator through its use cases (primary + secondary); the short card
+    // description is only a fallback. Normal map / tilesheet mode add a line about the mode.
+    const uses = (gen.uses || []).filter(Boolean), ul = $('#genUses');
+    const modeDesc = nm ? U.t(gen.normalDesc || 'Normal map derived from the texture: its brightness (or a channel) is used as height')
+      : sg ? U.t('Suggested for this generator: {0}', U.t(U.smoothNote(gen)))
+      : sm ? sheetDesc(tab) : uses.length ? '' : U.t(gen.desc);
+    $('#genDesc').textContent = modeDesc;
+    $('#genDesc').hidden = !modeDesc;
+    const showUses = uses.length > 0 && !aboutHidden().includes(gen.id);
+    $('#genAbout').hidden = !showUses;
+    $('#aboutBtn').hidden = !uses.length;
+    $('#aboutBtn').classList.toggle('on', showUses);
+    ul.innerHTML = '';
+    uses.forEach((u, i) => {
+      const row = el('div', 'use-row');
+      row.append(el('span', 'use-label', U.t(i ? 'Secondary use' : 'Primary use')), el('span', 'use-text', U.t(u)));
+      ul.append(row);
+    });
     syncModeBar(tab, gen);
     const root = $('#controls');
     const scroll = root.scrollTop;
@@ -239,6 +261,9 @@
     if (nm) {
       // normal mode swaps the texture's settings for the normal map's own
       refreshVis = U.ui.build(root, U.NORMAL_PARAMS, tab.normal.params, { change: onNormalChange, collapsed: (tab.view.normalSections = tab.view.normalSections || {}), persist: save });
+    } else if (sg) {
+      // smoothness mode: the texture's settings are replaced by the smoothness map's own
+      refreshVis = U.ui.build(root, U.smoothParams(gen), tab.smooth.params, { change: onSmoothChange, collapsed: (tab.view.smoothSections = tab.view.smoothSections || {}), persist: save });
     } else if (sm) {
       // tilesheet mode adds a Tilesheet tab in front of the generator's own settings; the sh_* keys
       // are routed to tab.sheet so presets / reset of the generator leave them alone
@@ -249,20 +274,22 @@
         set: (t, k, v) => { lastKey = String(k); if (lastKey.startsWith('sh_')) tab.sheet[lastKey.slice(3)] = v; else t[k] = v; return true; },
       });
       refreshVis = U.ui.build(root, U.SHEET_PARAMS.concat(gen.params), vals, {
-        change: (rebuild) => (lastKey.startsWith('sh_') ? onSheetChange(rebuild, lastKey) : onParamChange(rebuild)),
+        // the key is consumed per change: list item edits write to the item objects (not through the proxy),
+        // so they must not inherit the key of an earlier top-level edit
+        change: (rebuild) => { const k = lastKey; lastKey = ''; return k.startsWith('sh_') ? onSheetChange(rebuild, k) : onParamChange(rebuild); },
         collapsed: tab.view.sections,
         persist: save,
       });
     } else {
       refreshVis = U.ui.build(root, gen.params, tab.params, { change: onParamChange, collapsed: tab.view.sections, persist: save });
     }
-    const mk = tab.id + ':' + nm + ':' + sm; // switching tab or mode starts the panel at the top
+    const mk = tab.id + ':' + nm + ':' + sm + ':' + sg; // switching tab or mode starts the panel at the top
     root.scrollTop = panelKey === mk ? scroll : 0;
     panelKey = mk;
     syncUndo();
     $('#randBtn').hidden = !gen.params.some((d) => d.type === 'seed' || (d.type === 'list' && d.item.some((i) => i.type === 'seed')));
     syncPresets();
-    if (nm) $('#presetBar').hidden = true;
+    if (nm || sg) $('#presetBar').hidden = true;
   }
 
   const sheetDesc = (tab) => U.getGen(tab.type).animLoop
@@ -275,11 +302,12 @@
   function modesFor(gen) {
     const alt = [];
     if (hasNormal(gen)) alt.push(['normal', 'Normal map']);
+    if (U.hasSmooth(gen)) alt.push(['smooth', 'Smoothness']);
     if (hasSheet(gen)) alt.push(['sheet', 'Tilesheet']);
     if (!alt.length) return null;
-    return [['plain', hasNormal(gen) ? 'Texture' : 'Single frame']].concat(alt);
+    return [['plain', hasNormal(gen) || U.hasSmooth(gen) ? 'Texture' : 'Single frame']].concat(alt);
   }
-  const modeOf = (tab) => (normalOn(tab) ? 'normal' : sheetOn(tab) ? 'sheet' : 'plain');
+  const modeOf = (tab) => (normalOn(tab) ? 'normal' : smoothOn(tab) ? 'smooth' : sheetOn(tab) ? 'sheet' : 'plain');
 
   function syncModeBar(tab, gen) {
     const modes = modesFor(gen), seg = $('#modeSeg');
@@ -303,9 +331,12 @@
     const tab = cur(), gen = tab && U.getGen(tab.type), modes = gen && modesFor(gen);
     if (!modes || !modes.some(([id]) => id === mode) || modeOf(tab) === mode) return;
     tab.normal.on = mode === 'normal';
+    if (!tab.smooth) tab.smooth = newSmooth(gen);
+    tab.smooth.on = mode === 'smooth';
     tab.sheet.on = mode === 'sheet';
     if (mode === 'sheet') tab.view.sections.__tab = 'Tilesheet';
     buildPanel();
+    syncExportLabel(); // the number of files can differ per mode (frame sequence vs. one sheet)
     renderPreview(1);
     save();
   }
@@ -327,6 +358,7 @@
     save();
   }
 
+  function onSmoothChange(rebuild) { onNormalChange(rebuild); if (rebuild) return; $('#genName').textContent = U.t(U.getGen(cur().type).name) + ' · ' + U.t(cur().smooth.params.roughness ? 'Roughness' : 'Smoothness'); }
   function onNormalChange(rebuild) {
     markDirty(cur());
     if (rebuild) buildPanel();
@@ -412,17 +444,24 @@
       if (gen.heightMap) { src = U.canvas(W, H); gen.render(src.getContext('2d'), W, H, tab.params, { preview, height: true }); }
       return { canvas: U.normalMap(src, tab.normal.params), info: Object.assign({}, info, { normal: true }) };
     }
+    if (smoothOn(tab)) {
+      let hsrc = null;
+      if (tab.smooth.params.source === 'height' && gen.heightMap) { hsrc = U.canvas(W, H); gen.render(hsrc.getContext('2d'), W, H, tab.params, { preview, height: true }); }
+      return { canvas: U.smoothMap(c, tab.smooth.params, hsrc), info: Object.assign({}, info, { smooth: tab.smooth.params.roughness ? 'roughness' : 'smoothness' }) };
+    }
     return { canvas: c, info };
   }
 
   // (a normal map is never reduced to hard pixel-art colors)
-  const pixelExport = () => S.hardPixels && S.exportSize <= PIXEL_MAX && !normalOn(cur());
+  const pixelExport = () => S.hardPixels && S.exportSize <= PIXEL_MAX && !derivedOn(cur());
   // long side of the preview; "export" previews the real export size (capped for big sizes)
   const previewLong = () => (S.previewRes === 'export' ? Math.min(S.exportSize, 1024) : S.previewRes);
 
   /* render at the requested size; for small pixel-art exports, supersample and resolve each output
      pixel to one real color with hard alpha (no anti-aliased edges) */
   function renderOutput(tab, W, H, preview, layer) {
+    // a tilesheet is a whole number of equal frames: snap the size down to a multiple of the grid
+    if (sheetOn(tab)) { const n = +tab.sheet.grid || 1; W = Math.max(n, Math.floor(W / n) * n); H = Math.max(n, Math.floor(H / n) * n); }
     if (!pixelExport() || W > PIXEL_MAX || H > PIXEL_MAX) return renderTab(tab, W, H, preview, layer);
     const f = HARD_FACTOR, big = renderTab(tab, W * f, H * f, preview, layer);
     const sd = big.canvas.getContext('2d').getImageData(0, 0, W * f, H * f).data, BW = W * f;
@@ -451,7 +490,9 @@
       }
     }
     oc.putImageData(img, 0, 0);
-    return { canvas: out, info: big.info };
+    // info from the supersampled render: frame sizes must describe the W×H result
+    const info = big.info && big.info.sheet ? Object.assign({}, big.info, { sheet: Object.assign({}, big.info.sheet, { fw: W / big.info.sheet.n, fh: H / big.info.sheet.n }) }) : big.info;
+    return { canvas: out, info };
   }
 
   function renderPreview(scale) {
@@ -473,11 +514,10 @@
     lastPreviewMs = ms;
     lastBuf = res.canvas;
     lastInfo = res.info;
-    lastScale = scale;
+    lastScale = atExport ? 1 : scale; // the export-size preview always renders at full size
     drawView();
     status();
-    if (sheetOn(tab) !== !!player.timer) syncPlayer();
-    else if (player.timer) drawPlayer();
+    updatePlayer();
   }
 
   // While dragging a slider on a slow generator, render a half-res draft, then refine when idle.
@@ -504,19 +544,42 @@
     layoutView();
   }
 
-  /* tilesheet preview player: plays the frames of the current preview sheet in a corner box */
-  const player = { timer: 0, k: 0, gap: 0 };
+  /* preview player in a corner box: plays the frames of the current tilesheet, or (for generators with a
+     frame sequence export) renders and plays the frames of the sequence at a small size */
+  const player = { timer: 0, k: 0, gap: 0, fps: 0, mode: '', frames: null };
+  // the frame sequence of a tab (export layers with ids frame0, frame1 …), or null
+  const seqOf = (tab) => {
+    const l = !sheetOn(tab) && exportLayersOf(tab);
+    return l && l.every((x) => /^frame\d+$/.test(x.id)) ? l : null;
+  };
+  const seqFps = (tab) => U.clamp(+tab.params.fps || 12, 1, 60);
+  const playerMode = (tab) => (!tab ? '' : sheetOn(tab) ? (tab.sheet.play ? 'sheet' : '') : seqOf(tab) ? 'seq' : '');
   function syncPlayer() {
-    const tab = cur(), on = sheetOn(tab) && tab.sheet.play;
+    const tab = cur(), mode = playerMode(tab);
     clearInterval(player.timer);
     player.timer = 0;
-    $('#animBox').hidden = !on;
-    if (!on) return;
-    player.timer = setInterval(stepPlayer, 1000 / U.clamp(tab.sheet.fps, 1, 60));
+    player.mode = mode;
+    $('#animBox').hidden = !mode;
+    if (!mode) return;
+    player.fps = mode === 'sheet' ? U.clamp(tab.sheet.fps, 1, 60) : seqFps(tab);
+    player.timer = setInterval(stepPlayer, 1000 / player.fps);
     drawPlayer();
+  }
+  // keeps the player in step with the current tab (mode on / off, fps)
+  function updatePlayer() {
+    const tab = cur(), mode = playerMode(tab);
+    if (mode !== player.mode || (mode && (mode === 'sheet' ? U.clamp(tab.sheet.fps, 1, 60) : seqFps(tab)) !== player.fps)) syncPlayer();
+    else if (player.timer) drawPlayer();
   }
   function stepPlayer() {
     const tab = cur();
+    if (player.mode === 'seq') {
+      const l = seqOf(tab);
+      if (!l) return;
+      player.k = (player.k + 1) % l.length;
+      drawPlayer();
+      return;
+    }
     if (!sheetOn(tab) || !lastInfo.sheet) return;
     const N = lastInfo.sheet.n ** 2;
     if (player.gap > 0) { player.gap--; if (!player.gap) player.k = 0; }
@@ -525,6 +588,7 @@
     drawPlayer();
   }
   function drawPlayer() {
+    if (player.mode === 'seq') return drawSeqFrame();
     const sh = lastInfo.sheet, c = $('#animView');
     if (!sh || !lastBuf) return;
     const N = sh.n * sh.n, k = Math.min(player.k, N - 1);
@@ -533,6 +597,23 @@
     g.clearRect(0, 0, sh.fw, sh.fh);
     if (!player.gap) g.drawImage(lastBuf, (k % sh.n) * sh.fw, Math.floor(k / sh.n) * sh.fh, sh.fw, sh.fh, 0, 0, sh.fw, sh.fh);
     $('#animLabel').textContent = player.gap ? U.t('pause · {0} fps', cur().sheet.fps) : U.t('Frame {0} / {1} · {2} fps', k + 1, N, cur().sheet.fps);
+  }
+  // frame sequence: frames are rendered on demand at preview size and kept until the settings change
+  function drawSeqFrame() {
+    const tab = cur(), l = seqOf(tab), c = $('#animView');
+    if (!l) return;
+    const [W, H] = dims(aspectOf(tab), 200), key = JSON.stringify([tab.type, tab.aspect, tab.params]);
+    if (!player.frames || player.frames.key !== key) player.frames = { key, list: [] };
+    const k = player.k % l.length;
+    let f = player.frames.list[k];
+    if (!f) {
+      try { f = player.frames.list[k] = renderTab(tab, W, H, false, l[k].id).canvas; } catch (e) { console.error(e); return; }
+    }
+    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+    const g = c.getContext('2d');
+    g.clearRect(0, 0, W, H);
+    g.drawImage(f, 0, 0);
+    $('#animLabel').textContent = U.t('Frame {0} / {1} · {2} fps', k + 1, l.length, player.fps);
   }
 
   function viewScale(tab) {
@@ -575,6 +656,7 @@
     }
     if (lastInfo.hotspot) parts.push(U.t('Hotspot @ export: {0}', `${Math.floor(lastInfo.hotspot[0] * eW)}, ${Math.floor(lastInfo.hotspot[1] * eH)}`));
     if (pixelExport()) parts.push(U.t('hard pixels'));
+    if (lastInfo.smooth) parts.push(U.t(lastInfo.smooth === 'roughness' ? 'roughness map' : 'smoothness map'));
     if (lastInfo.normal) parts.push(U.t('normal map ({0})', tab.normal.params.yDir === 'dx' ? 'DirectX' : 'OpenGL'));
     if (lastInfo.text) parts.push(lastInfo.text.replace(/\b(bricks|cells|paths)\b/g, (w) => U.t(w)));
     $('#statusInfo').textContent = parts.join('  ·  ');
@@ -618,7 +700,40 @@
     $('#exportBtn').title = (l ? U.t('Separate layers: {0}', l.map((x) => x.suffix).join(', ')) + ' · ' : '') + 'Ctrl+S';
   }
 
+  /* use-case box: hidden per generator (ids kept in localStorage) */
+  const ABOUT_KEY = 'ugtg.aboutHidden', SCALE_KEY = 'ugtg.inspectorScale';
+  const aboutHidden = () => { try { const v = JSON.parse(localStorage.getItem(ABOUT_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
+  function toggleAbout() {
+    const tab = cur();
+    if (!tab) return;
+    const ids = aboutHidden(), i = ids.indexOf(tab.type);
+    if (i >= 0) ids.splice(i, 1); else ids.push(tab.type);
+    try { localStorage.setItem(ABOUT_KEY, JSON.stringify(ids)); } catch (e) { /* not remembered */ }
+    const show = i >= 0;
+    $('#genAbout').hidden = !show;
+    $('#aboutBtn').classList.toggle('on', show);
+  }
+  /* inspector size: scales the settings panel (CSS --insp), remembered in localStorage */
+  const SCALES = [0.9, 1, 1.1, 1.25, 1.4, 1.6, 1.75];
+  function setInspScale(v) {
+    v = SCALES.includes(+v) ? +v : 1;
+    document.documentElement.style.setProperty('--insp', v);
+    try { localStorage.setItem(SCALE_KEY, String(v)); } catch (e) { /* not remembered */ }
+    $('#inspScale').value = String(v);
+    if (cur()) { layoutView(); fitAllTitles(); }
+  }
+  function buildInspScale() {
+    const sel = $('#inspScale');
+    for (const v of SCALES) { const o = el('option', null, Math.round(v * 100) + ' %'); o.value = String(v); sel.append(o); }
+    let v = 1;
+    try { v = +localStorage.getItem(SCALE_KEY) || 1; } catch (e) { /* default */ }
+    sel.onchange = () => setInspScale(sel.value);
+    setInspScale(v);
+    $('#aboutBtn').onclick = toggleAbout;
+  }
+
   function buildChrome() {
+    buildInspScale();
     const asp = $('#aspect');
     for (const [k] of ASPECTS) { const o = el('option', null, k); o.value = k; asp.append(o); }
     const co = el('option', null, U.t('Custom…'));
@@ -718,6 +833,15 @@
     $('#presetNext').onclick = () => stepPreset(1);
     $('#resetBtn').onclick = () => {
       const t = cur();
+      if (smoothOn(t)) {
+        if (!confirm(U.t('Reset the smoothness settings to the suggestion for this generator?'))) return;
+        t.smooth.params = U.smoothDefaults(U.getGen(t.type));
+        markDirty(t);
+        buildPanel();
+        renderPreview(1);
+        save();
+        return;
+      }
       if (normalOn(t)) {
         if (!confirm(U.t('Reset the normal map settings to defaults?'))) return;
         t.normal.params = U.normalDefaults(U.getGen(t.type));
@@ -786,6 +910,7 @@
       // seeds inside list items too (particle layers etc.)
       if (d.type === 'list') for (const it of t.params[d.key]) for (const sd of d.item) if (sd.type === 'seed') it[sd.key] = roll();
     }
+    t.preset = null; // new seeds: the settings no longer match the applied preset
     markDirty(t);
     buildPanel();
     renderPreview(1);
@@ -824,6 +949,24 @@
   }
 
   /* ---------- picker / welcome ---------- */
+  /* card hover: the card tilts slightly toward the pointer and a white specular streak slides across it
+     with the rotation (CSS variables read by .gen-card.holo and its ::after) */
+  function holo(card) {
+    const set = (e) => {
+      if (card._leaving) return;
+      const r = card.getBoundingClientRect(), x = U.clamp((e.clientX - r.left) / r.width), y = U.clamp((e.clientY - r.top) / r.height);
+      const st = card.style, tilt = reduceMotion() ? 0 : 5;
+      st.setProperty('--rx', ((0.5 - y) * tilt).toFixed(2) + 'deg'); st.setProperty('--ry', ((x - 0.5) * tilt).toFixed(2) + 'deg');
+      // the light streak moves opposite to the pointer, as a reflection on the tilted card would
+      st.setProperty('--sx', (100 - x * 100).toFixed(1) + '%'); st.setProperty('--sy', (100 - y * 100).toFixed(1) + '%');
+      card.classList.add('holo');
+    };
+    card.addEventListener('pointermove', set);
+    card.addEventListener('pointerenter', set);
+    card.addEventListener('pointerleave', () => card.classList.remove('holo'));
+  }
+
+  const thumbCache = new Map();
   function genGrid(container, onPick) {
     container.innerHTML = '';
     for (const gen of U.generators) {
@@ -831,16 +974,23 @@
       card.type = 'button';
       const thumb = el('div', 'gen-thumb bg-' + (gen.bg || 'checker'));
       try {
-        const [W, H] = dims(gen.aspect || '1:1', 128);
-        const { canvas } = renderTab({ type: gen.id, params: U.defaultsFor(gen.params) }, W, H, true);
-        thumb.append(canvas);
+        // thumbnails don't depend on the language: rendered once per generator, then copied
+        let src = thumbCache.get(gen.id);
+        if (!src) {
+          const [W, H] = dims(gen.aspect || '1:1', 128);
+          src = renderTab({ type: gen.id, params: U.defaultsFor(gen.params) }, W, H, true).canvas;
+          thumbCache.set(gen.id, src);
+        }
+        const c = U.canvas(src.width, src.height);
+        c.getContext('2d').drawImage(src, 0, 0);
+        thumb.append(c);
       } catch (e) { console.error(e); }
       const meta = el('div', 'gen-meta');
       const name = el('div', 'gen-name');
       const ic = el('span', 'gen-icon');
       ic.innerHTML = gen.icon;
       const title = el('span', 'gen-title', U.t(gen.name));
-      title.title = U.t(gen.name);
+      title.title = title.textContent;
       name.append(ic, title);
       // footer at the bottom of the card: tags left, TILEABLE chip right (keeps the title row free)
       const foot = el('div', 'gen-foot');
@@ -850,6 +1000,7 @@
       card.append(thumb, meta);
       card.dataset.tags = (gen.tags || []).join('|');
       card.onclick = () => onPick(gen.id);
+      holo(card);
       container.append(card);
     }
     filterGrid(container, false);
@@ -989,7 +1140,7 @@
   /* separate-layer export: generators with `exportLayers(params)` -> [{ id, suffix }] (or null for one image) */
   function exportLayersOf(tab) {
     const gen = tab && U.getGen(tab.type);
-    if (!gen || !gen.exportLayers || normalOn(tab) || sheetOn(tab)) return null;
+    if (!gen || !gen.exportLayers || derivedOn(tab) || sheetOn(tab)) return null;
     const l = gen.exportLayers(tab.params);
     return l && l.length ? l : null;
   }
@@ -1009,7 +1160,7 @@
         let { canvas } = renderOutput(tab, W, H, false, layer ? layer.id : undefined);
         if (fmt[0] === 'image/jpeg') {
           // JPEG has no alpha: flatten onto black
-          const flat = U.canvas(W, H), g = flat.getContext('2d');
+          const flat = U.canvas(canvas.width, canvas.height), g = flat.getContext('2d');
           g.fillStyle = '#000';
           g.fillRect(0, 0, W, H);
           g.drawImage(canvas, 0, 0);
@@ -1024,8 +1175,8 @@
         }
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        const suffix = normalOn(tab) ? '_normal' : sheetOn(tab) ? `_sheet${tab.sheet.grid}x${tab.sheet.grid}` : layer ? '_' + layer.suffix : '';
-        a.download = `${safeName(tabName(tab))}${suffix}_${W}x${H}.${fmt[1]}`;
+        const suffix = normalOn(tab) ? '_normal' : smoothOn(tab) ? (tab.smooth.params.roughness ? '_roughness' : '_smoothness') : sheetOn(tab) ? `_sheet${tab.sheet.grid}x${tab.sheet.grid}` : layer ? '_' + layer.suffix : '';
+        a.download = `${safeName(tabName(tab))}${suffix}_${canvas.width}x${canvas.height}.${fmt[1]}`;
         document.body.append(a);
         a.click();
         a.remove();
@@ -1062,16 +1213,22 @@
 
   /* ---------- persistence ---------- */
   let saveT = 0;
+  function writeSession() {
+    saveT = 0;
+    try {
+      localStorage.setItem(STORE, JSON.stringify({
+        tabs: S.tabs, active: S.active, previewRes: S.previewRes, exportSize: S.exportSize, format: S.format, hardPixels: S.hardPixels, tags: S.tags,
+      }));
+    } catch (e) { /* storage unavailable: session just isn't remembered */ }
+  }
+  // debounced; a pending save is flushed when the page is hidden or closed, so the last edit isn't lost
   function save() {
     clearTimeout(saveT);
-    saveT = setTimeout(() => {
-      try {
-        localStorage.setItem(STORE, JSON.stringify({
-          tabs: S.tabs, active: S.active, previewRes: S.previewRes, exportSize: S.exportSize, format: S.format, hardPixels: S.hardPixels, tags: S.tags,
-        }));
-      } catch (e) { /* storage unavailable: session just isn't remembered */ }
-    }, 300);
+    saveT = setTimeout(writeSession, 300);
   }
+  const flushSave = () => { if (saveT) { clearTimeout(saveT); writeSession(); } };
+  window.addEventListener('pagehide', flushSave);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushSave(); });
 
   function autoName(t, gen) {
     if (!t.name) return { name: null, num: t.num || 1 };
@@ -1101,6 +1258,7 @@
         dirty: !!t.dirty,
         preset: typeof t.preset === 'string' ? t.preset : null,
         normal: newNormal(gen, t.normal),
+        smooth: newSmooth(gen, t.smooth),
         sheet: newSheet(t.sheet),
       };
       if (d.active === t.id) S.active = tab.id;

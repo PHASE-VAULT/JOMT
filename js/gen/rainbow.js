@@ -35,7 +35,8 @@
   U.register({
     id: 'rainbow',
     name: 'Rainbow',
-    desc: 'Rainbow sprites on transparent background: natural, double, fogbow, halo ring, cartoon and pixel bands',
+    desc: 'Rainbow sprites on transparent background: natural, double, fogbow, halo ring, cartoon or pixel-art bands',
+    uses: ['Sky sprites for weather and atmosphere in games, placed in the background after rain or around the sun.', 'Decorative arcs and halo rings for cartoon art, stickers and children\'s apps.'],
     tags: ['VFX', 'Nature'],
     aspect: '2:1',
     normalMap: false, // a sky sprite, not a surface
@@ -51,7 +52,7 @@
       { key: 'span', label: 'Visible span', type: 'range', min: 5, max: 340, step: 1, default: 180, show: isArc, tip: 'How many degrees of the circle are drawn' },
       { key: 'endFade', label: 'End fade', type: 'range', min: 0, max: 1, step: 0.01, default: 0.25, show: isArc, tip: 'Soft fade-out at both ends of the arc. 0 = cut off' },
 
-      { type: 'section', label: 'Colors' },
+      { type: 'section', label: 'Color' },
       { key: 'palette', label: 'Palette', type: 'select', default: 'spectrum', options: [['spectrum', 'Spectrum (natural)'], ['custom', 'Custom color stops']] },
       {
         key: 'stops', label: 'Stops', type: 'list', itemLabel: 'Stop', max: 12, show: (p) => p.palette === 'custom',

@@ -271,6 +271,8 @@
       }
       case 'list': {
         const items = values[d.key];
+        // items saved before a field existed get its default (e.g. a newly added per-item setting)
+        for (const it of items) for (const id of d.item) if (id.key && !(id.key in it)) it[id.key] = clone(id.default);
         const head = el('div', 'list-head');
         const add = el('button', 'btn small', '+ ' + U.t('Add {0}', U.t(d.itemLabel || 'Item')));
         add.type = 'button';
@@ -279,9 +281,11 @@
         const fold = el('button', 'btn small ghost', U.t('Collapse all'));
         fold.type = 'button';
         fold.onclick = () => {
+          // UI-only: no settings change (no undo step, no dirty marker, the preset stays)
           const all = items.every((it) => it._collapsed);
           items.forEach((it) => { it._collapsed = !all; });
-          hooks.change(true);
+          row.querySelectorAll(':scope > .list-item').forEach((c, i) => c.classList.toggle('collapsed', !!(items[i] && items[i]._collapsed)));
+          if (hooks.persist) hooks.persist();
         };
         const btns = el('div', 'list-btns');
         btns.append(fold, add);

@@ -14,8 +14,9 @@
   U.register({
     id: 'redDot',
     name: 'Red Dot Sight',
-    desc: '1x reflex / holographic reticles: dots, rings, deltas, chevrons with LED glow and irregularity',
-    tags: ['UI', 'Shooter'],
+    desc: 'Reflex and holographic sight reticles with dots, rings, deltas and chevrons, LED glow and irregularity',
+    uses: ['Reticle textures for red dot and holographic sight models in shooters, drawn in white and tinted in the engine.', 'Minimal aim indicators for HUDs and VR interfaces.'],
+    tags: ['UI', 'Shooter', 'Military'],
     bg: 'black',
     icon: U.icon('<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2"/>'),
     params: [

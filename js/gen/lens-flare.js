@@ -37,7 +37,8 @@
   U.register({
     id: 'lensflare',
     name: 'Lens Flare',
-    desc: 'Frontal lens flare from bright sources (sun, flashlight, headlight): core, rays, anamorphic streak, halo, ghosts, lens dirt',
+    desc: 'Frontal lens flares with core, rays, anamorphic streak, halo, ghosts and lens dirt, additive or with alpha',
+    uses: ['Flare sprites for the sun, flashlights and headlights in game engines, rendered additively over the scene.', 'Glare and sparkle elements for photo editing, thumbnails and motion graphics.'],
     tags: ['VFX', 'Lighting', 'Shooter'],
     bg: 'black',
     icon: U.icon('<circle cx="12" cy="12" r="2.6" fill="currentColor"/><path d="M12 3v5M12 16v5M3 12h5M16 12h5M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3"/>'),

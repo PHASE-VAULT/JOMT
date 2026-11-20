@@ -1,10 +1,11 @@
-/* Gradients / ramps: linear, radial, angular, diamond, square; any number of color stops,
-   repeat / mirror, posterized steps (toon ramps), bias and dithering against banding. */
+/* Gradients / ramps: linear, radial, angular, diamond, square; any number of color stops (each with an
+   influence that widens or narrows its share of the ramp), rotation + stretch, repeat / mirror, posterized
+   steps (toon ramps), bias, invert (opacity and / or color, e.g. for masks) and dithering against banding. */
 (function () {
   'use strict';
   const U = window.UGTG;
   const TAU = Math.PI * 2;
-  const S = (pos, color, alpha = 1) => ({ pos, color, alpha });
+  const S = (pos, color, alpha = 1, influence = 1) => ({ pos, color, alpha, influence });
   // n hard-edged bands cycling through the given colors (2 stops per band)
   const bands = (n, ...cols) => Array.from({ length: n }, (_, i) => [S(i / n, cols[i % cols.length]), S((i + 1) / n, cols[i % cols.length])]).flat();
 
@@ -16,37 +17,43 @@
     rainbow: [S(0, '#ff3b3b'), S(0.2, '#ffb02e'), S(0.4, '#f7f04a'), S(0.6, '#3fdc7a'), S(0.8, '#3a8cff'), S(1, '#a456ff')],
     mint: [S(0, '#06150f'), S(0.5, '#2c8f6c'), S(1, '#c9fbe6')],
     fade: [S(0, '#ffffff', 1), S(1, '#ffffff', 0)],
+    band: [S(0, '#ffffff', 0), S(0.5, '#ffffff', 1), S(1, '#ffffff', 0)],
   };
 
   U.register({
     id: 'gradient',
     name: 'Gradient',
-    desc: 'Linear, radial, angular gradients and ramps / LUTs with color stops',
+    desc: 'Linear, radial, angular, diamond and square gradients with color stops, toon steps and dithering',
+    uses: ['Color ramps, LUTs and alpha masks for shaders, e.g. toon lighting ramps, sky gradients or fade masks.', 'Backgrounds for UI panels, websites and presentation slides.'],
     tags: ['UI', 'Texturing'],
     icon: U.icon('<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M8 5v14M12.5 5v14M17 5v14" opacity=".35"/>'),
     params: [
       { type: 'section', label: 'Gradient' },
       {
         key: 'preset', label: 'Preset', type: 'select', default: 'sunset',
-        options: [['custom', 'Custom'], ['bw', 'Black → white'], ['sunset', 'Sunset'], ['fire', 'Fire ramp'], ['toon', 'Toon (3 tones)'], ['rainbow', 'Rainbow'], ['mint', 'Mint'], ['fade', 'White → transparent']],
+        options: [['custom', 'Custom'], ['bw', 'Black → white'], ['sunset', 'Sunset'], ['fire', 'Fire ramp'], ['toon', 'Toon (3 tones)'], ['rainbow', 'Rainbow'], ['mint', 'Mint'], ['fade', 'Mask: white → transparent'], ['band', 'Mask: transparent → white → transparent']],
         apply: (v, p) => { if (PRESETS[v]) { p.stops = U.clone(PRESETS[v]); if (v === 'toon') p.steps = 3; } },
       },
       { key: 'shape', label: 'Shape', type: 'select', default: 'linear', options: [['linear', 'Linear'], ['radial', 'Radial'], ['angular', 'Angular (conic)'], ['diamond', 'Diamond'], ['square', 'Square']] },
-      { key: 'angle', label: 'Angle', type: 'range', min: -180, max: 180, step: 1, default: 90, show: (p) => p.shape !== 'radial' },
+      { key: 'angle', label: 'Rotation', type: 'range', min: -180, max: 180, step: 1, default: 90, show: (p) => p.shape !== 'radial' || p.stretch !== 1, tip: 'Degrees. A radial gradient only shows rotation once it is stretched' },
       { key: 'scale', label: 'Scale', type: 'range', min: 0.05, max: 3, step: 0.01, default: 1 },
+      { key: 'stretch', label: 'Stretch', type: 'range', min: 0.1, max: 5, step: 0.01, default: 1, show: (p) => p.shape === 'radial' || p.shape === 'diamond' || p.shape === 'square', tip: 'Squashes the shape across the rotation axis: ellipses, long diamonds / rectangles' },
       { key: 'cx', label: 'Center X', type: 'range', min: -1, max: 1, step: 0.01, default: 0, show: (p) => p.shape !== 'linear' },
       { key: 'cy', label: 'Center Y', type: 'range', min: -1, max: 1, step: 0.01, default: 0, show: (p) => p.shape !== 'linear' },
       { key: 'repeat', label: 'Repeat', type: 'select', default: 'none', options: [['none', 'None (clamp)'], ['repeat', 'Repeat'], ['mirror', 'Mirror']] },
       { key: 'reverse', label: 'Reverse', type: 'bool', default: false },
+      { key: 'invert', label: 'Invert', type: 'bool', default: false, tip: 'Inverts the finished gradient, e.g. transparent → white → transparent becomes white → transparent → white' },
+      { key: 'invertMode', label: 'Invert what', type: 'select', default: 'alpha', options: [['alpha', 'Opacity (mask)'], ['color', 'Color'], ['both', 'Color + opacity']], show: (p) => p.invert },
       { type: 'section', label: 'Color stops' },
       {
         key: 'stops', label: 'Stops', type: 'list', itemLabel: 'Stop', max: 16,
-        itemSummary: (s) => `${(+s.pos).toFixed(2)} · ${s.color}${s.alpha < 1 ? ' · ' + Math.round(s.alpha * 100) + '%' : ''}`,
+        itemSummary: (s) => `${(+s.pos).toFixed(2)} · ${s.color}${s.alpha < 1 ? ' · ' + Math.round(s.alpha * 100) + '%' : ''}${s.influence != null && +s.influence !== 1 ? ' · ×' + (+s.influence).toFixed(2) : ''}`,
         default: U.clone(PRESETS.sunset),
         item: [
           { key: 'pos', label: 'Position', type: 'range', min: 0, max: 1, step: 0.005, default: 0.5 },
           { key: 'color', label: 'Color', type: 'color', default: '#ffffff' },
           { key: 'alpha', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, default: 1 },
+          { key: 'influence', label: 'Influence', type: 'range', min: 0, max: 4, step: 0.01, default: 1, tip: 'How strongly this stop pulls on its neighbours: above 1 it claims more of the ramp around it, below 1 less; 0 = hard edge at its position' },
         ],
       },
       { type: 'section', label: 'Shaping', collapsed: true, active: (p) => p.bias !== 1 || p.steps >= 2 || p.dither > 0 },
@@ -55,6 +62,13 @@
       { key: 'dither', label: 'Dither', type: 'range', min: 0, max: 4, step: 0.1, default: 1, tip: 'Adds a little noise to hide 8-bit banding' },
     ],
     presets: [
+      { name: 'Mask: white → transparent', group: 'Masks', values: { preset: 'fade', dither: 0.5 } },
+      { name: 'Mask: transparent → white → transparent', group: 'Masks', values: { preset: 'band', dither: 0.5 } },
+      { name: 'Mask: white → transparent → white', group: 'Masks', values: { preset: 'band', invert: true, dither: 0.5 } },
+      { name: 'Mask: hard center band', group: 'Masks', values: { preset: 'band', stops: [S(0, '#ffffff', 0), S(0.5, '#ffffff', 1, 3), S(1, '#ffffff', 0)], dither: 0.5 } },
+      { name: 'Mask: radial falloff', group: 'Masks', values: { preset: 'fade', shape: 'radial', dither: 0.5 } },
+      { name: 'Mask: rotated ellipse', group: 'Masks', values: { preset: 'fade', shape: 'radial', stretch: 2.2, angle: 30, dither: 0.5 } },
+      { name: 'Mask: soft square edge', group: 'Masks', values: { preset: 'fade', shape: 'square', angle: 0, stops: [S(0.6, '#ffffff', 1), S(1, '#ffffff', 0)], dither: 0.5 } },
       { name: 'Day sky', group: 'Realistic', values: { preset: 'custom', stops: [S(0, '#1f5fc8'), S(0.55, '#7fb6ee'), S(1, '#e6f2fb')] } },
       { name: 'Sunset sky', group: 'Realistic', values: { preset: 'custom', stops: [{ pos: 0, color: '#1b1446', alpha: 1 }, { pos: 0.45, color: '#a33b6b', alpha: 1 }, { pos: 0.75, color: '#f2733a', alpha: 1 }, { pos: 1, color: '#ffd27a', alpha: 1 }], bias: 0.8 } },
       { name: 'Night sky', group: 'Realistic', values: { preset: 'custom', bias: 1.6, stops: [S(0, '#010208'), S(0.6, '#0b1638'), S(1, '#25386b')] } },
@@ -82,16 +96,20 @@
       { name: 'Tech square pulse', group: 'Sci-fi', values: { preset: 'custom', shape: 'square', angle: 0, scale: 0.3, repeat: 'mirror', stops: [S(0, '#00151f'), S(0.85, '#00384f'), S(1, '#00e5ff')] } },
     ],
     render(ctx, W, H, p) {
-      const stops = p.stops.slice().sort((a, b) => a.pos - b.pos).map((s) => ({ pos: s.pos, c: U.hex(s.color), a: s.alpha }));
+      const stops = p.stops.slice().sort((a, b) => a.pos - b.pos).map((s) => ({ pos: s.pos, c: U.hex(s.color), a: s.alpha, w: s.influence == null ? 1 : Math.max(0, +s.influence) }));
       if (!stops.length) return;
       const ang = (p.angle * Math.PI) / 180, ca = Math.cos(ang), sa = Math.sin(ang);
-      const span = Math.abs(ca) + Math.abs(sa);
+      const span = Math.abs(ca) + Math.abs(sa), st = p.stretch || 1;
+      const invA = p.invert && p.invertMode !== 'color', invC = p.invert && p.invertMode !== 'alpha';
       const sample = (t, o) => {
         if (t <= stops[0].pos) { const s = stops[0]; o[0] = s.c[0]; o[1] = s.c[1]; o[2] = s.c[2]; return s.a; }
         for (let i = 1; i < stops.length; i++) {
           const b = stops[i];
           if (t <= b.pos) {
-            const a = stops[i - 1], f = b.pos > a.pos ? (t - a.pos) / (b.pos - a.pos) : 1;
+            const a = stops[i - 1];
+            let f = b.pos > a.pos ? (t - a.pos) / (b.pos - a.pos) : 1;
+            // influence: weighted blend, the heavier stop holds its color further toward the other one
+            if (a.w !== b.w) { const wa = (1 - f) * a.w, wb = f * b.w; f = wa + wb > 0 ? wb / (wa + wb) : f; }
             o[0] = a.c[0] + (b.c[0] - a.c[0]) * f; o[1] = a.c[1] + (b.c[1] - a.c[1]) * f; o[2] = a.c[2] + (b.c[2] - a.c[2]) * f;
             return a.a + (b.a - a.a) * f;
           }
@@ -104,10 +122,10 @@
         const rx = dx * ca + dy * sa, ry = -dx * sa + dy * ca;
         let t;
         switch (p.shape) {
-          case 'radial': t = Math.hypot(dx, dy) / p.scale; break;
+          case 'radial': t = Math.hypot(rx, ry * st) / p.scale; break;
           case 'angular': t = U.mod(Math.atan2(dy, dx) - ang, TAU) / TAU; break;
-          case 'diamond': t = (Math.abs(rx) + Math.abs(ry)) / p.scale; break;
-          case 'square': t = Math.max(Math.abs(rx), Math.abs(ry)) / p.scale; break;
+          case 'diamond': t = (Math.abs(rx) + Math.abs(ry * st)) / p.scale; break;
+          case 'square': t = Math.max(Math.abs(rx), Math.abs(ry * st)) / p.scale; break;
           default: t = ((nx * ca + ny * sa) / span / p.scale) * 0.5 + 0.5;
         }
         if (p.repeat === 'repeat') t = t - Math.floor(t);
@@ -116,7 +134,9 @@
         if (p.reverse) t = 1 - t;
         if (p.bias !== 1) t = Math.pow(t, p.bias);
         if (p.steps >= 2) t = Math.min(p.steps - 1, Math.floor(t * p.steps)) / (p.steps - 1);
-        const a = sample(t, o);
+        let a = sample(t, o);
+        if (invA) a = 1 - a;
+        if (invC) { o[0] = 255 - o[0]; o[1] = 255 - o[1]; o[2] = 255 - o[2]; }
         const d = p.dither > 0 && p.steps < 2 ? (U.hash(x, y, 7) - 0.5) * p.dither : 0;
         o[0] += d; o[1] += d; o[2] += d;
         o[3] = a * 255 + d;

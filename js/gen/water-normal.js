@@ -140,7 +140,8 @@
   U.register({
     id: 'water-normal',
     name: 'Water Normals',
-    desc: 'Tileable water normal and height maps from layered waves, noise, rain ripples, caustic cells and flow streaks',
+    desc: 'Tileable water normal and height maps from layered waves, chop, rain ripples, caustics and flow streaks',
+    uses: ['Scrolling normal maps for ocean, lake, river and puddle shaders in real-time engines.', 'Height maps for displacing water meshes or driving refraction and caustic effects.'],
     tags: ['Texturing', 'Nature', 'VFX'],
     tileable: true,
     normalMap: false, // the output already is a normal map, computed from exact slopes

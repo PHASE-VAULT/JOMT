@@ -24,7 +24,8 @@
   U.register({
     id: 'button',
     name: 'UI Button',
-    desc: 'UI buttons with simple bevel shading, rounded / chamfered corners and states',
+    desc: 'UI buttons with bevel shading, gradient fills, outlines, glow and hover, pressed and disabled states',
+    uses: ['Button backgrounds for game menus, HUDs and app interfaces, exported as a matching set of states for hover and press feedback.', 'Retro or mock-up interface elements for prototypes, tutorials and presentation slides.'],
     tags: ['UI'],
     aspect: '4:1',
     bg: 'gray',

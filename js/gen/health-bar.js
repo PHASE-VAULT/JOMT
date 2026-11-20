@@ -72,7 +72,8 @@
   U.register({
     id: 'healthbar',
     name: 'Linear Bar',
-    desc: 'Health / status bars: border, fill, segments, noise distortion and grunge, separate layer export',
+    desc: 'Linear HUD bars with border, fill, segments, noise and grunge, exportable as separate layers',
+    uses: ['Health, stamina and progress bars for game HUDs; export track, fill, border and progress map separately and drive the fill in the engine.', 'Loading bars and stat meters in menus and app interfaces.'],
     tags: ['UI', 'Shooter'],
     aspect: '4:1',
     bg: 'gray',

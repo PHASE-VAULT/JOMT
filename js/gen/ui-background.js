@@ -88,7 +88,8 @@
   U.register({
     id: 'ui-background',
     name: 'UI Background',
-    desc: 'Simple grungy UI backgrounds: gradient, noise variants, grunge stains and cutouts',
+    desc: 'Grungy UI backgrounds from gradients, noise, stains and cutouts with torn edges',
+    uses: ['Panel, menu and inventory backgrounds for games with a worn military, horror or industrial look.', 'Backdrops for posters, social media graphics and title cards.'],
     tags: ['UI', 'Texturing'],
     aspect: '16:9',
     normalMap: false, // a flat UI background, not a surface

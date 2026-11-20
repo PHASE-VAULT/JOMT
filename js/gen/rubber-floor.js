@@ -138,7 +138,8 @@
   U.register({
     id: 'rubber-floor',
     name: 'Rubber / PVC Floor',
-    desc: 'Tileable rubber and PVC flooring: coin and square studs, diamond plate, ribs, pebble and hammered grip, gym floors with EPDM flecks, vinyl tiles, welded seams and puzzle mats',
+    desc: 'Tileable rubber and PVC floors with studs, diamond plate, ribs, EPDM flecks, tile seams and height map',
+    uses: ['Floor materials for gyms, garages, industrial sites and playgrounds in 3D environments.', 'Grip and tread textures for mats, vehicle interiors and prop surfaces.'],
     tags: ['Texturing'],
     tileable: true,
     heightMap: true,

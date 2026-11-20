@@ -87,7 +87,8 @@
   U.register({
     id: 'planks',
     name: 'Plank Floor',
-    desc: 'Tileable wooden floors and decking: random lengths, offsets, herringbone, basket weave, grain, knots, gaps and wear',
+    desc: 'Tileable plank floors and decking in random, offset, herringbone or basket-weave layouts with height map',
+    uses: ['Wooden floor, deck and dock materials for interiors and exteriors in 3D scenes.', 'Wooden backgrounds and panels for UI and 2D games.'],
     tags: ['Texturing'],
     tileable: true,
     heightMap: true,

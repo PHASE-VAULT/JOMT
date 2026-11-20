@@ -169,7 +169,8 @@
   U.register({
     id: 'shapebar',
     name: 'Shape Bar',
-    desc: 'A shape (orb, hexagon, heart, shield, flask …) that fills vertically or horizontally, with grunge and separate layer export',
+    desc: 'Fillable shapes such as orbs, hearts, shields and flasks with liquid surface, gloss and layer export',
+    uses: ['Health and mana orbs, potion flasks and heart containers for RPG and action-game HUDs, with the fill level driven in the engine.', 'Gauge icons for resource counters, achievements and rank badges.'],
     tags: ['UI', 'Shooter'],
     aspect: '1:1',
     bg: 'gray',

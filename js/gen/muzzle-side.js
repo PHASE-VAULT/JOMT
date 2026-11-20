@@ -9,8 +9,9 @@
   U.register({
     id: 'flashSide',
     name: 'Muzzle Flash (side)',
-    desc: 'Sideways flash plume with lobes and muzzle-brake jets',
-    tags: ['VFX', 'Shooter'],
+    desc: 'Side-view muzzle flash plumes with shock-diamond lobes and muzzle-brake side jets',
+    uses: ['Sideways muzzle flash sprites for third-person shooters, side-scrollers and weapon showcase views.', 'Exhaust plumes and thruster jets for vehicles and spaceships.'],
+    tags: ['VFX', 'Shooter', 'Military'],
    
     bg: 'black',
     icon: U.icon('<path d="M2 12h3"/><path d="M5 9.5c4 0 6-2.5 9-3 3 1 6 3 8 5.5-2 2.5-5 4.5-8 5.5-3-.5-5-3-9-3z"/>'),

@@ -72,7 +72,8 @@
   U.register({
     id: 'hitmarker',
     name: 'Hit Marker',
-    desc: 'Hit feedback marks for crosshairs: ticks, X, corners, wedges, arcs; kill / headshot variants, glow and pop animation',
+    desc: 'Hit markers from ticks, X shapes, corners, wedges or arcs, with kill variants, glow and pop animation',
+    uses: ['Hit-confirm feedback that flashes over the crosshair in shooters, with separate variants for headshots, kills and armor hits.', 'Click and impact feedback sprites in arcade and mobile games.'],
     tags: ['UI', 'Shooter'],
     bg: 'gray',
     icon: U.icon('<path d="M5 5l4 4M19 5l-4 4M5 19l4-4M19 19l-4-4"/>'),

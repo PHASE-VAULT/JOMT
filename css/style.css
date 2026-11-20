@@ -822,3 +822,42 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 3px; }
 .insp-tab[hidden] { display: none; }
 .insp-pane { padding-top: 14px; }
 .insp-pane[hidden] { display: none; }
+
+/* ---------- panel: about this generator (primary / secondary use) ---------- */
+.panel-head { flex-wrap: wrap; }
+.panel-titles { flex: 1; }
+.panel-about { flex-basis: 100%; margin-top: 2px; font-size: 12px; color: var(--muted); }
+.panel-about #genUses { max-height: 28vh; overflow: auto; display: grid; gap: 6px; margin-top: 4px; padding: 8px 10px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; }
+.use-row { display: grid; gap: 1px; line-height: 1.4; }
+.use-label { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text); opacity: 0.8; }
+.use-text { color: var(--muted); }
+
+/* ---------- generator cards: subtle specular hover ----------
+   The card tilts slightly toward the pointer and one soft, pure white streak of light runs diagonally
+   across it; the streak slides with the card's rotation (--sx / --sy from the pointer). */
+.gen-card { position: relative; }
+.gen-card::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 2;
+  background: linear-gradient(120deg, transparent 38%, rgb(255 255 255 / 0.05) 47%, rgb(255 255 255 / 0.08) 50%, rgb(255 255 255 / 0.05) 53%, transparent 62%);
+  background-size: 250% 250%;
+  background-position: var(--sx, 50%) var(--sy, 50%);
+  opacity: 0; transition: opacity 0.3s;
+}
+.gen-card.holo { transition: border-color 0.12s, transform 0.12s ease-out; transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(-2px); }
+.gen-card.holo::after { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .gen-card.holo { transform: translateY(-2px); }
+}
+
+
+/* ---------- inspector size: --insp scales the settings panel (width + contents) ---------- */
+.layout { grid-template-columns: minmax(0, 1fr) calc(340px * var(--insp, 1)); }
+.panel { zoom: var(--insp, 1); }
+.insp-scale { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; margin-right: 10px; color: var(--muted); }
+.insp-scale svg { width: 16px; height: 16px; flex: none; }
+.insp-scale select { height: 26px; padding: 0 6px; font-size: 12px; }
+#aboutBtn.on { color: var(--accent); }
+.insp-scale + .lang-bar { margin-left: 0; }
+@media (max-width: 860px) { .layout { grid-template-columns: 1fr; } .insp-scale { display: none; } }
+/* the mode explanation (normal map / smoothness / tilesheet) spans the full panel width under the title row */
+.panel-mode-desc { flex-basis: 100%; margin-top: -2px; line-height: 1.45; }
