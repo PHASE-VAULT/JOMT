@@ -1379,7 +1379,7 @@
   filterGrid($('#welcomeGrid'), false); // apply the saved tag filter
   buildTagBars();
   // deep link: index.html#new=camo opens a fresh tab of that generator
-  const hashType = (location.hash.match(/new=(\w+)/) || [])[1];
+  const hashType = (location.hash.match(/new=([\w-]+)/) || [])[1];
   if (hashType && U.getGen(hashType)) createTab(hashType);
   else refreshAll();
 })();

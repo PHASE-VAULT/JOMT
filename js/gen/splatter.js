@@ -16,6 +16,8 @@
     uses: ['Blood and gore decals on walls and floors in shooters and horror games, e.g. gunshot sprays, pools and drops.', 'Paint, ink, mud and coffee stains for stylized art, posters and UI.'],
     tags: ['Horror', 'Decals', 'Shooter'],
     bg: 'white',
+    normalMap: true, // normal map mode from the splatter's own height (liquid thickness)
+    heightMap: true,
     icon: U.icon('<path d="M12 7c3 0 5 2 5 5s-2 5-5 5-5-2-5-5 2-5 5-5z"/><circle cx="19.5" cy="6" r="1.2"/><circle cx="4.5" cy="18" r="1"/><circle cx="20" cy="17" r=".7"/><path d="M12 7V3M7.5 8.5L5 6" opacity=".6"/>'),
     params: [
       { type: 'section', label: 'Splatter' },
@@ -77,7 +79,8 @@
       { name: 'Splatoon-style ink', group: 'Game-inspired', values: { grunge: 0, dropVar: 0, pores: 0, size: 0.25, blobs: 6, irregular: 0.15, spikes: 12, spikeLen: 0.5, droplets: 30, dropSize: 0.05, mist: 0, directional: 0, color: '#ff7a00', rim: 0.25, rimColor: '#c04a00' } },
       { name: 'L4D-style bile', group: 'Game-inspired', values: { size: 0.22, irregular: 0.7, droplets: 120, mist: 300, seed: 55, color: '#7c8a1c', rim: 0.6, rimColor: '#3a4008' } },
     ],
-    render(ctx, W, H, p) {
+    render(ctx, W, H, p, opts) {
+      const heightOut = !!(opts && opts.height); // height map for the normal map mode: thin at the edge, thicker where the liquid pools
       const Sz = Math.min(W, H), cx = W / 2, cy = H / 2, rnd = U.rng(p.seed);
       const F = new Float32Array(W * H);
       const K = 1 / 0.5625; // normalizes (1 - d²/R²)² so the field is exactly 1 at d = r (R = 2r)
@@ -219,6 +222,11 @@
               const pr = U.fractal('value', (x / Sz) * 95, (y / Sz) * 95, 0, 0, 2, 0.5, 'fbm', p.seed + 73);
               a *= 1 - U.smoothstep(th - 0.05, th + 0.05, pr) * 0.95;
             }
+          }
+          if (heightOut) {
+            const hv = a * (0.3 + 0.7 * (1 - Math.exp(-Math.max(0, f - thr) * 1.4)));
+            d[o] = d[o + 1] = d[o + 2] = hv * 255; d[o + 3] = 255;
+            continue;
           }
           const r = col[0] + (rim[0] - col[0]) * k, g = col[1] + (rim[1] - col[1]) * k, b = col[2] + (rim[2] - col[2]) * k;
           if (solid) { d[o] = bg[0] + (r - bg[0]) * a; d[o + 1] = bg[1] + (g - bg[1]) * a; d[o + 2] = bg[2] + (b - bg[2]) * a; d[o + 3] = 255; }
