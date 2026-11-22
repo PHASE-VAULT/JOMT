@@ -196,6 +196,125 @@
     ctx.closePath();
   };
 
+  /* ---------- blur ----------
+     Gaussian-like blur of RGBA ImageData (3 box passes per axis, premultiplied so transparent pixels
+     don't bleed dark fringes). `r` = blur radius in px; `wrap` samples across the edges (tileable).
+     Returns a new Float32Array of premultiplied RGBA (0..255) so callers can blend before writing. */
+  U.blurRGBA = function (src, W, H, r, wrap) {
+    const N = W * H, a = new Float32Array(N * 4), b = new Float32Array(N * 4);
+    for (let i = 0, k = 0; i < N; i++, k += 4) {
+      const al = src[k + 3] / 255;
+      a[k] = src[k] * al; a[k + 1] = src[k + 1] * al; a[k + 2] = src[k + 2] * al; a[k + 3] = src[k + 3];
+    }
+    const br = Math.max(1, Math.round(r / 1.73)); // 3 box passes of radius br ≈ gaussian with sigma ≈ r / 2
+    const ix = (i, n) => (wrap ? ((i % n) + n) % n : i < 0 ? 0 : i >= n ? n - 1 : i);
+    const pass = (s, d, len, lines, step, lineStep) => {
+      const inv = 1 / (2 * br + 1);
+      for (let l = 0; l < lines; l++) {
+        const o = l * lineStep * 4, st = step * 4;
+        for (let c = 0; c < 4; c++) {
+          let sum = 0;
+          for (let k = -br; k <= br; k++) sum += s[o + ix(k, len) * st + c];
+          for (let i = 0; i < len; i++) {
+            d[o + i * st + c] = sum * inv;
+            sum += s[o + ix(i + br + 1, len) * st + c] - s[o + ix(i - br, len) * st + c];
+          }
+        }
+      }
+    };
+    for (let n = 0; n < 3; n++) { pass(a, b, W, H, 1, W); pass(b, a, H, W, W, 1); }
+    return a;
+  };
+
+  /* ---------- cellular (Voronoi) with exact border distance ----------
+     X, Y in lattice units over a periodic nx × ny lattice (whole numbers -> tiles). One feature point
+     per lattice cell, jittered by `jit` (0 = grid, 1 = fully random inside its cell); `stag` offsets
+     every odd row by half a cell (needs an even ny to tile). sx / sy: pixels per lattice unit, so
+     distances are measured in pixels even for stretched cells. Writes into `out`:
+       id  0..1 per cell, e = exact distance to the cell border (px), f1 = distance to the point (px),
+       ci, cj = wrapped cell index, es = smooth-min border distance (rounded corners) when k > 0 */
+  // feature point offsets per lattice cell, cached per (nx, ny, seed, jit, stag)
+  const voroTables = new Map();
+  function voroTable(nx, ny, seed, jit, stag) {
+    const key = nx + ',' + ny + ',' + seed + ',' + jit + ',' + (stag ? 1 : 0);
+    let t = voroTables.get(key);
+    if (t) return t;
+    if (voroTables.size > 24) voroTables.clear();
+    t = { ox: new Float32Array(nx * ny), oy: new Float32Array(nx * ny), id: new Float32Array(nx * ny) };
+    for (let j = 0, n = 0; j < ny; j++) for (let i = 0; i < nx; i++, n++) {
+      t.ox[n] = 0.5 + (stag && (j & 1) ? 0.5 : 0) + (hash(i, j, seed) - 0.5) * jit;
+      t.oy[n] = 0.5 + (hash(i, j, seed + 7) - 0.5) * jit;
+      t.id[n] = hash(i, j, seed + 104729);
+    }
+    voroTables.set(key, t);
+    return t;
+  }
+
+  U.voro = function (X, Y, nx, ny, seed, jit, stag, sx, sy, k, out) {
+    const T = voroTable(nx, ny, seed, jit, stag), OX = T.ox, OY = T.oy;
+    const P = U._vp || (U._vp = { x: 0, y: 0, wi: 0, wj: 0 });
+    const pt = (i, j, o) => {
+      let wi = i % nx; if (wi < 0) wi += nx;
+      let wj = j % ny; if (wj < 0) wj += ny;
+      const n = wj * nx + wi;
+      o.x = i + OX[n]; o.y = j + OY[n]; o.wi = wi; o.wj = wj;
+      return o;
+    };
+    const xi = Math.floor(X), yi = Math.floor(Y);
+    let best = 1e18, ax = 0, ay = 0, bi = 0, bj = 0, bwi = 0, bwj = 0;
+    for (let j = yi - 1; j <= yi + 1; j++) {
+      for (let i = xi - (stag ? 2 : 1); i <= xi + 1; i++) {
+        pt(i, j, P);
+        const dx = (P.x - X) * sx, dy = (P.y - Y) * sy, d = dx * dx + dy * dy;
+        if (d < best) { best = d; ax = P.x; ay = P.y; bi = i; bj = j; bwi = P.wi; bwj = P.wj; }
+      }
+    }
+    // second pass: distance to the bisector with every neighbour point (exact cell border distance)
+    let e = 1e9, es = 0;
+    const kk = k > 0 ? k : 0, lim = kk * 6;
+    const ds = U._vds || (U._vds = new Float64Array(32));
+    let nd = 0;
+    for (let j = bj - 2; j <= bj + 2; j++) {
+      for (let i = bi - 2; i <= bi + 2; i++) {
+        if (i === bi && j === bj) continue;
+        pt(i, j, P);
+        const ux = (P.x - ax) * sx, uy = (P.y - ay) * sy, l = Math.sqrt(ux * ux + uy * uy);
+        if (l < 1e-9) continue;
+        const mx = ((ax + P.x) * 0.5 - X) * sx, my = ((ay + P.y) * 0.5 - Y) * sy;
+        const d = (mx * ux + my * uy) / l;
+        if (d < e) e = d;
+        if (kk && nd < 32) ds[nd++] = d;
+      }
+    }
+    if (kk) {
+      let s = 0;
+      for (let n = 0; n < nd; n++) if (ds[n] < e + lim) s += Math.exp(-(ds[n] - e) / kk);
+      es = e - kk * Math.log(s || 1);
+    }
+    out.id = T.id[bwj * nx + bwi];
+    out.e = e; out.es = kk ? es : e; out.f1 = Math.sqrt(best);
+    out.ci = bwi; out.cj = bwj; out.px = ax; out.py = ay;
+    return out;
+  };
+
+  /* bilinear W×H field from fn(x, y) sampled on a coarse grid (~`cells` samples per short side):
+     cheap smooth noise that looks the same at every resolution */
+  U.coarseField = function (W, H, cells, fn) {
+    const S = Math.min(W, H), st = Math.max(1, S / cells), gw = Math.ceil(W / st) + 2, gh = Math.ceil(H / st) + 2;
+    const g = new Float32Array(gw * gh);
+    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) g[j * gw + i] = fn(Math.min(W, i * st), Math.min(H, j * st));
+    const out = new Float32Array(W * H);
+    for (let y = 0; y < H; y++) {
+      const fy = y / st, j = Math.floor(fy), ty = fy - j;
+      for (let x = 0; x < W; x++) {
+        const fx = x / st, i = Math.floor(fx), tx = fx - i, o = j * gw + i;
+        const a0 = g[o] + (g[o + 1] - g[o]) * tx, b0 = g[o + gw] + (g[o + gw + 1] - g[o + gw]) * tx;
+        out[y * W + x] = a0 + (b0 - a0) * ty;
+      }
+    }
+    return out;
+  };
+
   U.icon = (inner) =>
     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
 

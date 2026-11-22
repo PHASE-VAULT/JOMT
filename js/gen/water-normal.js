@@ -147,6 +147,8 @@
     normalMap: false, // the output already is a normal map, computed from exact slopes
     icon: U.icon('<path d="M3 8c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/><path d="M3 13c2-2 4-2 6 0s4 2 6 0 4-2 6 0" opacity=".7"/><path d="M3 18c2-2 4-2 6 0s4 2 6 0 4-2 6 0" opacity=".45"/>'),
     exportLayers: (p) => (p.output === 'both' ? [{ id: 'normal', suffix: 'normal' }, { id: 'height', suffix: 'height' }] : null),
+    // live WebGL refraction preview (js/glpreview.js); two copies scroll against each other
+    glPreview: { water: true, isNormal: (p) => p.output === 'normal' || (p.output === 'both' && (p.view || 'normal') === 'normal'), flipY: (p) => p.yDir === 'dx' },
     params: [
       { type: 'section', label: 'Water' },
       { key: 'strength', label: 'Normal strength', type: 'range', min: 0, max: 4, step: 0.01, default: 1, tip: 'Scales every slope: 0 = flat, 1 = as designed' },
@@ -197,6 +199,7 @@
       let view = p.output === 'height' ? 'height' : 'normal';
       if (p.output === 'both') view = opts.layer || (opts.preview ? p.view || 'normal' : 'normal');
       if (opts.height) view = 'height';
+      if (opts.glNormal) view = 'normal';
 
       const S = Math.min(W, H), G = Math.max(1, Math.round(p.scale || 1)), N = W * H;
       const TX = (G * W) / S, TY = (G * H) / S; // tile size in world units

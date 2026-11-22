@@ -176,6 +176,7 @@
       renderPreview(1);
     }
     syncPlayer();
+    if (!cur() && U.glPreview) U.glPreview.hide();
     if (!cur()) requestAnimationFrame(() => fitTitles($('#welcomeGrid'))); // landing page just became visible
     save();
   }
@@ -518,6 +519,25 @@
     drawView();
     status();
     updatePlayer();
+    updateGL(tab);
+  }
+
+  /* live WebGL refraction preview for normal-map generators (`glPreview` in U.register, js/glpreview.js):
+     fed with the current normal map; a generator whose preview currently shows something else
+     (e.g. the height map) renders its normal map separately with { glNormal: true } */
+  function updateGL(tab) {
+    if (!U.glPreview) return;
+    const gen = tab && U.getGen(tab.type), cfg = gen && gen.glPreview;
+    if (!cfg || derivedOn(tab) || sheetOn(tab) || !lastBuf) { U.glPreview.hide(); return; }
+    let src = lastBuf;
+    if (cfg.isNormal && !cfg.isNormal(tab.params)) {
+      const [W, H] = dims(aspectOf(tab), 256);
+      try {
+        src = U.canvas(W, H);
+        gen.render(src.getContext('2d'), W, H, tab.params, { preview: true, glNormal: true });
+      } catch (e) { console.error(e); return; }
+    }
+    U.glPreview.update(src, tab.params, gen);
   }
 
   // While dragging a slider on a slow generator, render a half-res draft, then refine when idle.

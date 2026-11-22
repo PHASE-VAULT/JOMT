@@ -4,6 +4,49 @@
   'use strict';
   const U = window.UGTG;
 
+  /* out-of-focus look: blend the sharp render with a half and a full blur by a focus mask
+     (1 everywhere = uniform blur, which wraps across the edges and stays tileable) */
+  function defocus(ctx, W, H, p, bc) {
+    const r = p.blur * Math.min(W, H) / 512;
+    if (r < 0.35) return;
+    const img = ctx.getImageData(0, 0, W, H), d = img.data, N = W * H;
+    const mode = p.blurMode || 'uniform', wrap = mode === 'uniform' && !(p.vignette > 0);
+    const full = U.blurRGBA(d, W, H, r, wrap), half = mode === 'uniform' ? null : U.blurRGBA(d, W, H, r * 0.5, wrap);
+    const size = p.focusSize, soft = Math.max(0.02, p.focusSoft), fade = p.blurFade || 0;
+    for (let y = 0, i = 0; y < H; y++) {
+      const v = (y + 0.5) / H, cy = v * 2 - 1;
+      for (let x = 0; x < W; x++, i++) {
+        let m = 1;
+        if (mode !== 'uniform') {
+          const cx = ((x + 0.5) / W) * 2 - 1, rr = Math.hypot(cx, cy) / Math.SQRT2;
+          if (mode === 'edges') m = U.smoothstep(size, size + soft, rr);
+          else if (mode === 'center') m = 1 - U.smoothstep(size, size + soft, rr);
+          else m = U.smoothstep(size * 0.5, size * 0.5 + soft * 0.5, Math.abs(v - p.focusY));
+        }
+        if (m <= 0) continue;
+        const k = i * 4;
+        let R, G, B, A;
+        if (!half) { R = full[k]; G = full[k + 1]; B = full[k + 2]; A = full[k + 3]; }
+        else {
+          // sharp (premultiplied) -> half blur -> full blur
+          const al = d[k + 3] / 255, s = [d[k] * al, d[k + 1] * al, d[k + 2] * al, d[k + 3]];
+          const t = m < 0.5 ? m * 2 : (m - 0.5) * 2, A0 = m < 0.5 ? s : [half[k], half[k + 1], half[k + 2], half[k + 3]], B0 = m < 0.5 ? half : full;
+          R = A0[0] + (B0[k] - A0[0]) * t; G = A0[1] + (B0[k + 1] - A0[1]) * t; B = A0[2] + (B0[k + 2] - A0[2]) * t; A = A0[3] + (B0[k + 3] - A0[3]) * t;
+        }
+        const ia = A > 0.01 ? 255 / A : 0;
+        R *= ia; G *= ia; B *= ia;
+        if (fade > 0) {
+          const f = fade * m * 0.75;
+          if (p.mode === 'overlay') A *= 1 - f;
+          else if (p.mode === 'mask') { const tgt = p.invert ? 255 : 0; R += (tgt - R) * f; G += (tgt - G) * f; B += (tgt - B) * f; }
+          else { R += (bc[0] - R) * f; G += (bc[1] - G) * f; B += (bc[2] - B) * f; }
+        }
+        d[k] = R; d[k + 1] = G; d[k + 2] = B; d[k + 3] = A;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
   U.register({
     id: 'grime',
     name: 'Grime / Grunge',
@@ -31,6 +74,13 @@
       { key: 'vigShape', label: 'Shape', type: 'select', default: 'ellipse', options: [['ellipse', 'Ellipse (fits aspect)'], ['circle', 'Circle'], ['rect', 'Rectangle (edges)']], show: (p) => p.vignette > 0 },
       { key: 'vigBreak', label: 'Edge breakup', type: 'range', min: 0, max: 1, step: 0.01, default: 0.4, show: (p) => p.vignette > 0, tip: 'Noise along the border of the clean area' },
       { key: 'vigInvert', label: 'Invert (grunge in the center)', type: 'bool', default: false, show: (p) => p.vignette > 0 },
+      { type: 'section', label: 'Blur', active: (p) => p.blur > 0 },
+      { key: 'blur', label: 'Blur (out of focus)', type: 'range', min: 0, max: 40, step: 0.1, default: 0, tip: 'Softens the grime as if it were out of focus, e.g. behind UI panels or as a depth-of-field backdrop (px @ 512)' },
+      { key: 'blurMode', label: 'Blur area', type: 'select', default: 'uniform', show: (p) => p.blur > 0, options: [['uniform', 'Everywhere'], ['edges', 'Edges (sharp center)'], ['center', 'Center (sharp edges)'], ['band', 'Tilt-shift (sharp band)']], tip: 'Everywhere keeps the texture tileable; the other modes fade between sharp and blurred like a lens focus' },
+      { key: 'focusSize', label: 'Focus area size', type: 'range', min: 0, max: 1, step: 0.01, default: 0.35, show: (p) => p.blur > 0 && p.blurMode !== 'uniform', tip: 'Edges: size of the sharp center. Center: size of the blurred center. Tilt-shift: height of the sharp band' },
+      { key: 'focusSoft', label: 'Focus falloff', type: 'range', min: 0.02, max: 1, step: 0.01, default: 0.45, show: (p) => p.blur > 0 && p.blurMode !== 'uniform', tip: 'How gradually sharp turns into blurred' },
+      { key: 'focusY', label: 'Band position', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, show: (p) => p.blur > 0 && p.blurMode === 'band', tip: '0 = top, 1 = bottom' },
+      { key: 'blurFade', label: 'Defocus fade', type: 'range', min: 0, max: 1, step: 0.01, default: 0, show: (p) => p.blur > 0, tip: 'Blurred areas also lose strength, like haze in front of a camera' },
       { type: 'section', label: 'Output' },
       { key: 'mode', label: 'Output', type: 'select', default: 'overlay', options: [['overlay', 'Overlay (transparent)'], ['mask', 'Grayscale mask'], ['color', 'Dirt over base color']] },
       { key: 'dirt', label: 'Dirt color', type: 'color', default: '#2b2116', show: (p) => p.mode !== 'mask' },
@@ -50,6 +100,9 @@
       { name: 'Limescale', group: 'Realistic', values: { amount: 0.75, scale: 5, stains: 0.55, mottle: 0.6, speckles: 0.35, streaks: 0.3, mode: 'color', dirt: '#e2dfd6', base: '#4e555c' } },
       { name: 'Grunge frame (clean center)', group: 'Realistic', values: { amount: 1.2, contrast: 1.8, stains: 0.8, mottle: 0.5, speckles: 0.6, streaks: 0.3, vignette: 1, vigSize: 0.3, vigSoft: 0.45, vigBreak: 0.5 } },
       { name: 'Dirt mask (fine)', group: 'Realistic', values: { amount: 1, scale: 8, contrast: 1.2, stains: 0.4, mottle: 0.8, speckles: 0.6, streaks: 0, mode: 'mask' } },
+      { name: 'Out-of-focus UI backdrop', group: 'UI', values: { amount: 1.1, scale: 3, contrast: 1.6, stains: 0.8, mottle: 0.5, speckles: 0.7, streaks: 0.25, blur: 9, mode: 'color', dirt: '#0d0f10', base: '#2c3034' } },
+      { name: 'Defocused lens grime', group: 'UI', values: { amount: 0.9, scale: 2, contrast: 1.4, stains: 0.6, mottle: 0.3, speckles: 0.9, streaks: 0.4, vignette: 1, vigSize: 0.25, vigSoft: 0.5, blur: 14, blurMode: 'edges', focusSize: 0.2, focusSoft: 0.6, blurFade: 0.3, dirt: '#d8d2c4' } },
+      { name: 'Tilt-shift grunge frame', group: 'UI', values: { amount: 1.2, contrast: 1.8, stains: 0.8, mottle: 0.5, speckles: 0.6, streaks: 0.3, blur: 16, blurMode: 'band', focusSize: 0.3, focusSoft: 0.5 } },
       { name: 'Toon dirt', group: 'Stylized', values: { amount: 1, scale: 2, contrast: 4, stains: 0.8, mottle: 0, speckles: 0.6, streaks: 0, mode: 'color', dirt: '#6c4a2a', base: '#cdb88c' } },
       { name: 'Painterly grunge', group: 'Stylized', values: { amount: 1.2, scale: 2, contrast: 1.2, stains: 0.9, mottle: 0.8, speckles: 0.2, streaks: 0, mode: 'color', dirt: '#8a5a3a', base: '#e4cca4' } },
       { name: 'Comic speckle', group: 'Stylized', values: { amount: 1, scale: 1, contrast: 4, stains: 0, mottle: 0, speckles: 1, streaks: 0, mode: 'color', dirt: '#1e1e1e', base: '#f2e8d2' } },
@@ -103,6 +156,7 @@
         else if (p.mode === 'overlay') { o[0] = dc[0]; o[1] = dc[1]; o[2] = dc[2]; o[3] = g * 255; }
         else { o[0] = bc[0] + (dc[0] - bc[0]) * g; o[1] = bc[1] + (dc[1] - bc[1]) * g; o[2] = bc[2] + (dc[2] - bc[2]) * g; }
       });
+      if (p.blur > 0) defocus(ctx, W, H, p, bc);
     },
   });
 })();

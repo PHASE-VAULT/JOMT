@@ -82,6 +82,15 @@
         <canvas id="animView"></canvas>
         <span id="animLabel"></span>
       </div>
+      <div class="gl-box" id="glBox" hidden>
+        <div class="gl-head">
+          <span data-i18n>Refraction preview</span>
+          <button class="gl-fold" type="button" title="Show / hide the preview settings" data-i18n-title>⚙</button>
+        </div>
+        <canvas id="glView" width="240" height="240"></canvas>
+        <div class="gl-nogl" data-i18n>WebGL is not available in this browser.</div>
+        <div class="gl-ctl"></div>
+      </div>
       <div class="statusbar">
         <span id="statusInfo"></span>
         <span class="status-hint" data-i18n>Wheel to zoom · drag to pan</span>
@@ -188,6 +197,7 @@
   <script src="js/wear.js"></script>
   <script src="js/bar.js"></script>
   <script src="js/ground.js"></script>
+  <script src="js/glpreview.js"></script>
   <!-- generators, in grid order: grouped roughly by output type -->
   <!-- surfaces & materials -->
   <script src="js/gen/pattern.js"></script>
@@ -196,16 +206,26 @@
   <script src="js/gen/planks.js"></script>
   <script src="js/gen/plaster.js"></script>
   <script src="js/gen/paving.js"></script>
+  <script src="js/gen/cobblestone.js"></script>
   <script src="js/gen/rock.js"></script>
+  <script src="js/gen/moss.js"></script>
   <script src="js/gen/sand.js"></script>
   <script src="js/gen/gravel.js"></script>
   <script src="js/gen/mud.js"></script>
+  <!-- from the JOMT-main download, to sort out later -->
+  <script src="js/gen/sand-dl.js"></script>
+  <script src="js/gen/gravel-dl.js"></script>
+  <script src="js/gen/mud-dl.js"></script>
+  <script src="js/gen/dirt.js"></script>
   <script src="js/gen/rubber-floor.js"></script>
   <script src="js/gen/material.js"></script>
   <script src="js/gen/camo.js"></script>
+  <script src="js/gen/weapon-skin.js"></script>
+  <script src="js/gen/solar.js"></script>
   <script src="js/gen/grass.js"></script>
   <script src="js/gen/ice-snow.js"></script>
   <script src="js/gen/water-normal.js"></script>
+  <script src="js/gen/refraction.js"></script>
   <script src="js/gen/flowfield.js"></script>
   <!-- masks & maps -->
   <script src="js/gen/alien.js"></script>
@@ -220,6 +240,7 @@
   <script src="js/gen/gradient.js"></script>
   <!-- decals -->
   <script src="js/gen/splatter.js"></script>
+  <script src="js/gen/splatter-dl.js"></script>
   <script src="js/gen/blood-pool.js"></script>
   <script src="js/gen/graffiti.js"></script>
   <script src="js/gen/impact.js"></script>
@@ -253,6 +274,7 @@
   <script src="js/gen/health-bar.js"></script>
   <script src="js/gen/radial-bar.js"></script>
   <script src="js/gen/shape-bar.js"></script>
+  <script src="js/gen/organ.js"></script>
   <script src="js/gen/symbol.js"></script>
   <!-- aim & hud -->
   <script src="js/gen/crosshair.js"></script>
