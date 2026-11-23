@@ -90,7 +90,8 @@
       { key: 'outline', label: 'Outline', type: 'range', min: 0, max: 8, step: 0.1, default: 3, show: (p) => p.style !== 'realistic', tip: 'px @ 512' },
       { key: 'outlineColor', label: 'Outline color', type: 'color', default: '#1a1614', show: (p) => p.style !== 'realistic' && p.outline > 0 },
       { type: 'section', label: 'Shading' },
-      { key: 'light', label: 'Light angle', type: 'range', min: -180, max: 180, step: 1, default: -135, tip: '-135 = light from top-left' },
+      { key: 'lightMode', label: 'Light', type: 'select', default: 'angled', options: [['angled', 'Angled (light angle)'], ['ambient', 'Ambient (soft, no direction)']], tip: 'Ambient: soft light from all around, like an overcast sky: no direction and no glints; slopes and walls darken gently and contact shadows sit right under the pieces' },
+      { key: 'light', label: 'Light angle', type: 'range', min: -180, max: 180, step: 1, default: -135, show: (p) => p.lightMode !== 'ambient', tip: '-135 = light from top-left' },
       { key: 'lightAmt', label: 'Shading', type: 'range', min: 0, max: 1, step: 0.01, default: 0.8 },
       { key: 'shine', label: 'Specular', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, tip: 'Glints on metal petals, glass edges and stylized highlights' },
       { key: 'shadow', label: 'Contact shadow', type: 'range', min: 0, max: 1, step: 0.01, default: 0.45 },
@@ -130,7 +131,9 @@
       opts = opts || {};
       const height = !!opts.height || p.output === 'height';
       const S = Math.min(W, H), k = S / 512, cx = W / 2, cy = H / 2, seed = p.seed | 0, kind = kindOf(p), style = p.style;
-      const rnd = U.rng(seed), la = p.light * RAD, lx = Math.cos(la), ly = Math.sin(la), LA = p.lightAmt;
+      const rnd = U.rng(seed), la = p.light * RAD, LA = p.lightAmt;
+      // ambient: no light direction (lx = ly = 0): no offsets, no directional highlights, slopes darken evenly
+      const amb = p.lightMode === 'ambient', lx = amb ? 0 : Math.cos(la), ly = amb ? 0 : Math.sin(la);
       const C = { inner: hex(p.inner), chip: hex(p.chip), hole: hex(p.holeColor), surf: hex(p.surface), soot: hex(p.sootColor), dust: hex(p.dustColor), line: hex(p.outlineColor) };
       const irr = p.irregular, jag = p.jag;
 
@@ -297,7 +300,7 @@
                   // crater sloping down to the hole; the far wall catches the light, the lip at the edge too
                   const slope = 1 - t;
                   const lip = smoothstep(0.82, 1, t) * -facing;
-                  let b = 1 + LA * (0.42 * facing * (0.35 + 0.65 * slope) + 0.25 * lip) - 0.28 * slope * p.depth;
+                  let b = 1 + LA * (0.42 * facing * (0.35 + 0.65 * slope) + 0.25 * lip) - 0.28 * slope * p.depth - (amb ? LA * 0.18 * slope : 0);
                   b *= 0.82 + 0.4 * (nz - 0.5) + 0.12;
                   const base = kind === 'splinters' ? mix(C.inner, C.chip, smoothstep(0.3, 0.7, U.fractal('perlin', x / S * 70, y / S * 70, 0, 0, 2, 0.5, 'fbm', seed + 13))) : C.inner;
                   col = mul(base, b);
@@ -312,7 +315,7 @@
               const a = smoothstep(hh + px, hh - px, r), wall = Math.max(0.05, 0.15 + 0.45 * p.depth);
               const t = clamp((hh - r) / (hh * wall));
               if (!height) {
-                const wc = mul(kind === 'glass' ? C.chip : C.inner, 0.25 + 0.55 * LA * Math.max(0, facing) + 0.15 * nz);
+                const wc = mul(kind === 'glass' ? C.chip : C.inner, 0.25 + 0.55 * LA * (amb ? 0.3 : Math.max(0, facing)) + 0.15 * nz);
                 over(o, mix(wc, C.hole, Math.pow(t, 0.75)), a);
               } else { const g = lerp(0.18, 0, Math.pow(t, 0.6)) * 255 * a + d[o] * (1 - a); d[o] = d[o + 1] = d[o + 2] = g; d[o + 3] = 255; }
             }
@@ -334,8 +337,9 @@
             if (height) { ctx.fillStyle = gray(0.62 + c.tone * 0.12); ctx.fill(); ctx.restore(); continue; }
             ctx.fillStyle = css(mul(C.chip, 0.85 + c.tone * 0.3)); ctx.fill(); ctx.clip();
             const [ccx, ccy] = X([c.x, c.y]), rr = c.r * R;
-            const g = ctx.createLinearGradient(ccx + lx * rr, ccy + ly * rr, ccx - lx * rr, ccy - ly * rr);
-            g.addColorStop(0, `rgba(255,255,255,${0.35 * LA})`); g.addColorStop(1, `rgba(0,0,0,${0.45 * LA})`);
+            let g;
+            if (amb) { g = ctx.createRadialGradient(ccx, ccy, 0, ccx, ccy, rr * 1.1); g.addColorStop(0, `rgba(255,255,255,${0.1 * LA})`); g.addColorStop(0.5, 'rgba(255,255,255,0)'); g.addColorStop(1, `rgba(0,0,0,${0.3 * LA})`); } // rim darkens all around
+            else { g = ctx.createLinearGradient(ccx + lx * rr, ccy + ly * rr, ccx - lx * rr, ccy - ly * rr); g.addColorStop(0, `rgba(255,255,255,${0.35 * LA})`); g.addColorStop(1, `rgba(0,0,0,${0.45 * LA})`); }
             ctx.fillStyle = g; ctx.fillRect(ccx - rr * 2, ccy - rr * 2, rr * 4, rr * 4);
             ctx.restore();
             ctx.lineWidth = Math.max(0.5, K * 0.5); ctx.strokeStyle = 'rgba(0,0,0,0.35)'; poly(ctx, P); ctx.stroke();
@@ -373,8 +377,9 @@
             const col = mul(mix(C.inner, C.chip, q.tone), 1);
             const A = Xs([q.bl, q.midL, q.tip, q.base]), B = Xs([q.br, q.midR, q.tip, q.base]);
             if (height) { ctx.fillStyle = gray(0.7 + q.tone * 0.1); poly(ctx, Xs([q.bl, q.midL, q.tip, q.midR, q.br])); ctx.fill(); continue; }
-            ctx.fillStyle = css(mul(col, 1 + 0.3 * LA * side)); poly(ctx, A); ctx.fill();
-            ctx.fillStyle = css(mul(col, 1 - 0.3 * LA * side)); poly(ctx, B); ctx.fill();
+            const fl = amb ? 1 - 0.12 * LA : 1; // ambient: both flanks slope away from the sky
+            ctx.fillStyle = css(mul(col, fl + 0.3 * LA * side)); poly(ctx, A); ctx.fill();
+            ctx.fillStyle = css(mul(col, fl - 0.3 * LA * side)); poly(ctx, B); ctx.fill();
             ctx.strokeStyle = css(mul(C.chip, 0.45), 0.6); ctx.lineWidth = Math.max(0.4, K * 0.4); ctx.lineJoin = 'round';
             poly(ctx, Xs([q.bl, q.midL, q.tip, q.midR, q.br])); ctx.stroke();
           }
@@ -457,7 +462,7 @@
         ctx.restore();
         poly(ctx, Xs(hole)); stroke();
         // specular highlight: two short white dashes on the lit side of the burst
-        if (p.shine > 0 && kind !== 'glass') {
+        if (p.shine > 0 && kind !== 'glass' && !amb) {
           ctx.strokeStyle = `rgba(255,255,255,${0.5 + p.shine * 0.5})`; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(1, 2.2 * k);
           for (const [a, r1, r2b] of [[la - 0.35, 1.35, 1.7], [la + 0.05, 1.3, 1.45]]) {
             ctx.beginPath(); ctx.arc(cx, cy, R * (r1 + r2b) / 2 * Math.min(1, reach / 2), a - 0.18, a + 0.18); ctx.stroke();
@@ -471,7 +476,8 @@
         const r2 = U.rng(seed + 9), ow = p.outline * k;
         const facet = (pts, base, nx, ny, hv, alpha = 1) => {
           // flat shading: facet tilt (nx, ny) vs. the light
-          const b = 1 + LA * 0.55 * (nx * lx + ny * ly);
+          // ambient: tilted facets darken gently, whichever way they face
+          const b = amb ? 1 - LA * 0.2 * Math.min(1, nx * nx + ny * ny) : 1 + LA * 0.55 * (nx * lx + ny * ly);
           poly(ctx, Xs(pts));
           ctx.fillStyle = height ? gray(hv) : css(mul(base, b), alpha); ctx.fill();
           if (!height) {
@@ -539,7 +545,7 @@
           const j = (i + 1) % V, a = angs[i], b = angs[j] + (j === 0 ? TAU : 0), m = (a + b) / 2;
           const A = P(a, hv[i]), B = P(b, hv[j]);
           // the wall faces the center: lit when that points at the light
-          const lit = -(Math.cos(m) * lx + Math.sin(m) * ly), base = mix(C.hole, kind === 'glass' ? C.chip : C.inner, 0.25 + 0.35 * Math.max(0, lit) * LA);
+          const lit = -(Math.cos(m) * lx + Math.sin(m) * ly), base = mix(C.hole, kind === 'glass' ? C.chip : C.inner, 0.25 + 0.35 * (amb ? 0.3 : Math.max(0, lit)) * LA);
           facet([A, B, inner[j], inner[i]], base, 0, 0, 0.15);
         }
         facet(inner, C.hole, 0, 0, 0.02);

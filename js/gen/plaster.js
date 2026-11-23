@@ -19,7 +19,7 @@
     name: 'Plaster & Concrete',
     desc: 'Tileable plaster, stucco and concrete with pores, trowel marks, formwork, cracks, stains and height map',
     uses: ['Wall and floor materials for interiors, bunkers and building facades, with a height map for the normal map mode.', 'Subtly textured backgrounds for UI and print layouts.'],
-    tags: ['Texturing'],
+    tags: ['PBR'],
     tileable: true,
     heightMap: true,
     icon: U.icon('<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M7 15l3-3 2 2 4-5" opacity=".6"/><circle cx="8" cy="8" r=".8" fill="currentColor"/><circle cx="16" cy="17" r=".6" fill="currentColor"/>'),

@@ -57,6 +57,10 @@
       if (!e.dataset.i18nTitle) e.dataset.i18nTitle = e.title;
       e.title = U.t(e.dataset.i18nTitle);
     }
+    for (const e of r.querySelectorAll('[data-i18n-ph]')) {
+      if (!e.dataset.i18nPh) e.dataset.i18nPh = e.placeholder;
+      e.placeholder = U.t(e.dataset.i18nPh);
+    }
     for (const e of r.querySelectorAll('[data-i18n-aria]')) {
       if (!e.dataset.i18nAria) e.dataset.i18nAria = e.getAttribute('aria-label');
       e.setAttribute('aria-label', U.t(e.dataset.i18nAria));

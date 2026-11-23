@@ -262,8 +262,9 @@
 
       { type: 'section', label: 'Shading' },
       { key: 'style', label: 'Style', type: 'select', default: 'real', options: [['real', 'Realistic'], ['toon', 'Toon (cel bands)'], ['flat', 'Flat']] },
-      { key: 'lightAngle', label: 'Light direction', type: 'range', min: -180, max: 180, step: 1, default: -115, tip: '-90 = light from the top, -135 = top-left' },
-      { key: 'lightElev', label: 'Light height', type: 'range', min: 5, max: 85, step: 1, default: 40, show: (p) => p.style !== 'flat', tip: 'Low = grazing light, high = light from the front' },
+      { key: 'lightMode', label: 'Light', type: 'select', default: 'angled', options: [['angled', 'Angled (light angle)'], ['ambient', 'Ambient (soft, no direction)']], tip: 'Ambient: soft light from all around, like an overcast sky: no direction; the round darkens gently towards its edges, with a soft centred sheen and an even rim light' },
+      { key: 'lightAngle', label: 'Light direction', type: 'range', min: -180, max: 180, step: 1, default: -115, show: (p) => p.lightMode !== 'ambient', tip: '-90 = light from the top, -135 = top-left' },
+      { key: 'lightElev', label: 'Light height', type: 'range', min: 5, max: 85, step: 1, default: 40, show: (p) => p.style !== 'flat' && p.lightMode !== 'ambient', tip: 'Low = grazing light, high = light from the front' },
       { key: 'ambient', label: 'Ambient', type: 'range', min: 0, max: 1, step: 0.01, default: 0.35, show: (p) => p.style !== 'flat' },
       { key: 'specular', label: 'Specular', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
       { key: 'rough', label: 'Roughness (× material)', type: 'range', min: 0.3, max: 2.5, step: 0.01, default: 1, show: (p) => p.style !== 'flat' },
@@ -387,6 +388,10 @@
       const Lx = Math.cos(la) * Math.cos(le), Ly = Math.sin(la) * Math.cos(le), Lz = Math.sin(le);
       const l2x = Math.cos(la), l2y = Math.sin(la);
       let Hx = Lx, Hy = Ly, Hz = Lz + 1; { const m = Math.hypot(Hx, Hy, Hz); Hx /= m; Hy /= m; Hz /= m; }
+      // ambient light mode (light from all around): shading only from how much the surface faces the viewer, the
+      // highlight becomes a soft sheen along the centre line and the studio reflection a symmetric surround
+      const ambient = p.lightMode === 'ambient';
+      if (ambient) { Hx = 0; Hy = 0; Hz = 1; }
       const amb = p.ambient, spk = p.specular, refl = p.reflect, anS = p.aniso, rimL = p.rimLight, rimC = U.hex(p.rimColor).map((v) => v / 255);
       const oc = U.hex(p.outlineColor), seed = p.seed | 0;
       const MT = mats.map((m) => m && { c: m.c.map((v) => v / 255), metal: m.metal, rough: m.rough, aniso: m.aniso });
@@ -478,7 +483,7 @@
             }
             rough = clamp(rough, 0.05, 1);
             const ao = lerp(1, AO[i0], 0.85);
-            const ndl = nx * Lx + ny * Ly + nz * Lz;
+            const ndl = ambient ? nz : nx * Lx + ny * Ly + nz * Lz;
 
             if (style === 'flat') {
               const hl = spk > 0 && ndl > 0.93 ? 0.28 * Math.min(1, spk) : 0;
@@ -489,13 +494,13 @@
               let sx = nx - ak * ca, sy = ny - ak * sa, sz = nz;
               { const m = 1 / Math.sqrt(sx * sx + sy * sy + sz * sz); sx *= m; sy *= m; sz *= m; }
               const nh = Math.max(0, sx * Hx + sy * Hy + sz * Hz);
-              const ex = Math.pow(2, 1.5 + 9 * (1 - rough));
-              let spec = Math.pow(nh, ex) * (0.15 + 1.6 * (1 - rough) * (1 - rough));
+              const ex = Math.pow(2, 1.5 + 9 * (1 - rough)) * (ambient ? 0.3 : 1); // ambient: broad, dimmer sheen
+              let spec = Math.pow(nh, ex) * (0.15 + 1.6 * (1 - rough) * (1 - rough)) * (ambient ? 0.45 : 1);
               const sid = Math.min(NS - 1, Math.max(0, ((ph / Math.PI + 0.5) * (NS - 1)) | 0));
               if (style === 'real') spec *= Math.max(0, 1 + anS * an * 1.4 * streak[sid]);
               const rim = rimL > 0 ? rimL * Math.pow(1 - Math.max(0, nz), 2.5) : 0;
               if (style === 'toon') {
-                const band = ndl > 0.45 ? 1 : ndl > 0.0 ? 0.74 : 0.52;
+                const band = ambient ? (nz > 0.5 ? 1 : nz > 0.2 ? 0.8 : 0.62) : ndl > 0.45 ? 1 : ndl > 0.0 ? 0.74 : 0.52;
                 const lit = band * (0.8 + 0.2 * amb) * ao;
                 const hs = spec * spk > 0.3 ? 0.55 : 0;
                 const sm = metal > 0.5 ? 0.5 : 0.85;
@@ -503,10 +508,12 @@
                 const rh = rim > 0.18 ? rimL * 0.7 : 0;
                 cr += rimC[0] * rh; cg += rimC[1] * rh; cb += rimC[2] * rh;
               } else {
-                const diff = Math.max(0, (ndl + 0.15) / 1.15);
+                // ambient: edges darken gently, whichever way they face (facing ≈ the angled default's brightness)
+                const diff = ambient ? 0.78 * Math.max(0.35, 1 - (1 - nz * nz) * 0.75) : Math.max(0, (ndl + 0.15) / 1.15);
                 // studio environment: reflect the view vector, compare with the light direction in the image
+                // (ambient: an even surround, brighter toward grazing reflections on both sides, no direction)
                 const rx = 2 * sz * sx, ry = 2 * sz * sy, e2 = rx * l2x + ry * l2y;
-                const env = 0.03 + 0.97 * smoothstep(0.02 - rough * 0.4, 0.7 + rough * 0.2, e2) + 0.35 * smoothstep(-0.5, -0.97, e2);
+                const env = ambient ? 0.25 + 0.4 * smoothstep(0.1, 0.95, Math.hypot(rx, ry)) : 0.03 + 0.97 * smoothstep(0.02 - rough * 0.4, 0.7 + rough * 0.2, e2) + 0.35 * smoothstep(-0.5, -0.97, e2);
                 // metal: albedo-tinted reflections and highlight
                 const kM = amb * 0.4 * ao + diff * 0.45 * ao + refl * env * 0.95, sTm = spk * spec * 1.5;
                 const mr = ar * kM + sTm * (ar * 0.6 + 0.4), mg = ag * kM + sTm * (ag * 0.6 + 0.4), mb = ab * kM + sTm * (ab * 0.6 + 0.4);

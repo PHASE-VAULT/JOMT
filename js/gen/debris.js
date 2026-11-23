@@ -168,7 +168,7 @@
     const op = mixed ? M.opacity : p.opacity, glass = pc.mat === 'glass';
     const roundR = (mixed ? M.round : p.roundness) * pc.size * 0.25;
     const col = mixColor(c1, c2, pc.tone * p.colorVar + (1 - p.colorVar) * 0.5);
-    const [lx, ly] = light;
+    const [lx, ly] = light, amb = !!light[2]; // ambient: lx = ly = 0, no direction
     c.save();
     trace(c, pc.pts, dx, dy, roundR);
     c.fillStyle = css(col, op);
@@ -178,7 +178,13 @@
     // light falloff across the piece: rounded stones get a dome (highlight toward the light, dark rim),
     // flat chunks and shards a straight gradient
     let g;
-    if (pc.mat === 'stone') {
+    if (amb) {
+      // ambient: top faces the sky, the rim slopes away and darkens, the same all around
+      g = c.createRadialGradient(cx, cy, 0, cx, cy, h * 1.05);
+      g.addColorStop(0, `rgba(255,255,255,${p.lightAmt * (pc.mat === 'stone' ? 0.12 : 0.06)})`);
+      g.addColorStop(0.55, 'rgba(255,255,255,0)');
+      g.addColorStop(1, `rgba(0,0,0,${p.lightAmt * (pc.mat === 'stone' ? 0.4 : glass ? 0.1 : 0.25)})`);
+    } else if (pc.mat === 'stone') {
       // (lx, ly) points toward the light
       g = c.createRadialGradient(cx + lx * h * 0.35, cy + ly * h * 0.35, 0, cx, cy, h * 1.05);
       g.addColorStop(0, `rgba(255,255,255,${p.lightAmt * 0.3})`);
@@ -217,7 +223,13 @@
     }
     // bevel: light rim on the lit side, dark rim on the far side
     const b = (mixed ? M.bevel : p.bevel) * k;
-    if (b > 0) {
+    if (b > 0 && amb) {
+      // ambient: an even, soft dark rim all around
+      c.lineWidth = b; c.lineJoin = 'round';
+      trace(c, pc.pts, dx, dy, roundR);
+      c.strokeStyle = `rgba(0,0,0,${p.lightAmt * (glass ? 0.12 : 0.22)})`;
+      c.stroke();
+    } else if (b > 0) {
       c.lineWidth = b;
       c.lineJoin = 'round';
       trace(c, pc.pts, dx + lx * b * 0.6, dy + ly * b * 0.6, roundR);
@@ -230,10 +242,10 @@
     // glass / glaze: glint when the shard faces the light, plus a streak
     const shine = mixed ? M.shine : p.shine;
     if (shine > 0) {
-      const face = Math.pow(Math.max(0, Math.cos(pc.rot * 2 + pc.glint * 3 - Math.atan2(ly, lx))), 6);
+      const face = amb ? 0 : Math.pow(Math.max(0, Math.cos(pc.rot * 2 + pc.glint * 3 - Math.atan2(ly, lx))), 6);
       if (face > 0.02) { c.fillStyle = `rgba(255,255,255,${face * shine * 0.75})`; c.fillRect(cx - pc.size, cy - pc.size, pc.size * 2, pc.size * 2); }
       const a = pc.pts[0], z = pc.pts[Math.floor(pc.pts.length / 2)];
-      c.strokeStyle = `rgba(255,255,255,${shine * 0.5})`;
+      c.strokeStyle = `rgba(255,255,255,${shine * (amb ? 0.3 : 0.5)})`;
       c.lineWidth = Math.max(0.6, pc.size * 0.03);
       c.beginPath();
       c.moveTo(U.lerp(a[0], z[0], 0.2) + dx, U.lerp(a[1], z[1], 0.2) + dy);
@@ -307,14 +319,15 @@
       { key: 'opacity', label: 'Piece opacity', type: 'range', min: 0.05, max: 1, step: 0.01, default: MAT.glass.opacity, show: (p) => p.material !== 'mixed', tip: 'Low for see-through glass' },
       { key: 'grain', label: 'Surface grain', type: 'range', min: 0, max: 1, step: 0.01, default: 0.45 },
       { type: 'section', label: 'Shading' },
-      { key: 'light', label: 'Light angle', type: 'range', min: -180, max: 180, step: 1, default: -135, tip: '-135 = light from top-left' },
+      { key: 'lightMode', label: 'Light', type: 'select', default: 'angled', options: [['angled', 'Angled (light angle)'], ['ambient', 'Ambient (soft, no direction)']], tip: 'Ambient: soft light from all around, like an overcast sky: no direction and no glints; pieces darken gently toward their rims and the contact shadow sits right under them' },
+      { key: 'light', label: 'Light angle', type: 'range', min: -180, max: 180, step: 1, default: -135, show: (p) => p.lightMode !== 'ambient', tip: '-135 = light from top-left' },
       { key: 'lightAmt', label: 'Shading', type: 'range', min: 0, max: 1, step: 0.01, default: 0.7 },
       { key: 'bevel', label: 'Bevel', type: 'range', min: 0, max: 10, step: 0.1, default: MAT.glass.bevel, show: (p) => p.material !== 'mixed', tip: 'px @ 512' },
       { key: 'shine', label: 'Glints', type: 'range', min: 0, max: 1, step: 0.01, default: MAT.glass.shine, show: (p) => p.material !== 'mixed', tip: 'Pieces facing the light flash bright (glass, glaze)' },
       { key: 'edgeW', label: 'Edge line', type: 'range', min: 0, max: 3, step: 0.05, default: 1 },
       { key: 'shadow', label: 'Contact shadow', type: 'range', min: 0, max: 1, step: 0.01, default: 0.45 },
       { key: 'shadowSize', label: 'Shadow softness', type: 'range', min: 0, max: 20, step: 0.25, default: 3, show: (p) => p.shadow > 0, tip: 'px @ 512' },
-      { key: 'shadowDist', label: 'Shadow offset', type: 'range', min: 0, max: 20, step: 0.25, default: 2, show: (p) => p.shadow > 0, tip: 'px @ 512, away from the light' },
+      { key: 'shadowDist', label: 'Shadow offset', type: 'range', min: 0, max: 20, step: 0.25, default: 2, show: (p) => p.shadow > 0 && p.lightMode !== 'ambient', tip: 'px @ 512, away from the light' },
       { type: 'section', label: 'Dust' },
       { key: 'dust', label: 'Fine fragments', type: 'range', min: 0, max: 1, step: 0.01, default: 0.35, tip: 'Tiny specks and crumbs' },
       { key: 'dustSize', label: 'Fragment size', type: 'range', min: 0.3, max: 6, step: 0.05, default: 1.4, show: (p) => p.dust > 0, tip: 'px @ 512' },
@@ -356,7 +369,9 @@
         ctx.drawImage(densityCanvas(p, W, H), 0, 0, W, H);
         return;
       }
-      const pieces = layout(p, W, H), la = p.light * RAD, light = [Math.cos(la), Math.sin(la)];
+      const pieces = layout(p, W, H), la = p.light * RAD;
+      // ambient: no light direction (the contact shadow sits right under each piece)
+      const light = p.lightMode === 'ambient' ? [0, 0, 1] : [Math.cos(la), Math.sin(la)];
       const r = U.rng((p.seed | 0) + 5);
 
       // height map (also the source for normal map mode)

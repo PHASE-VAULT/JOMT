@@ -186,7 +186,8 @@
       { key: 'shadow', label: 'Drop shadow', type: 'range', min: 0, max: 1, step: 0.01, default: 0.45 },
 
       { type: 'section', label: 'Shading', active: (p) => p.bevel > 0 || p.innerShadow > 0 || p.specular > 0 },
-      { key: 'shadeLight', label: 'Light angle', type: 'range', min: -180, max: 180, step: 1, default: -120, show: (p) => p.shape !== 'none', tip: 'Where the light comes from for bevel and specular (-90 = from above, -135 = top left)' },
+      { key: 'lightMode', label: 'Light', type: 'select', default: 'angled', options: [['angled', 'Angled (light angle)'], ['ambient', 'Ambient (soft, no direction)']], show: (p) => p.shape !== 'none', tip: 'Ambient: soft light from all around: the bevel and inner shadow run evenly along the whole edge and the specular becomes a soft sheen in the middle' },
+      { key: 'shadeLight', label: 'Light angle', type: 'range', min: -180, max: 180, step: 1, default: -120, show: (p) => p.shape !== 'none' && p.lightMode !== 'ambient', tip: 'Where the light comes from for bevel and specular (-90 = from above, -135 = top left)' },
       { key: 'gloss', label: 'Gloss', type: 'range', min: 0, max: 1, step: 0.01, default: 0.35, show: (p) => p.shape !== 'none' && p.fill !== 'outline' },
       { key: 'bevel', label: 'Bevel', type: 'range', min: 0, max: 1, step: 0.01, default: 0, show: (p) => p.shape !== 'none', tip: 'Raised edge: light rim on the lit side, dark rim on the far side' },
       { key: 'bevelSize', label: 'Bevel width', type: 'range', min: 0.02, max: 0.4, step: 0.01, default: 0.12, show: (p) => p.shape !== 'none' && p.bevel > 0 },
@@ -328,10 +329,19 @@
           g.strokeStyle = p.insetColor; g.lineWidth = p.inset / k; body(); g.stroke(); g.restore();
         }
         bodyShade = () => {
-          const la = (p.shadeLight ?? -120) * Math.PI / 180, lx = Math.cos(la), ly = Math.sin(la);
+          // ambient light (from all around): no direction, so every offset below is zero
+          const ambient = p.lightMode === 'ambient';
+          const la = (p.shadeLight ?? -120) * Math.PI / 180, lx = ambient ? 0 : Math.cos(la), ly = ambient ? 0 : Math.sin(la);
           // bevel: the outline shifted toward / away from the light and clipped to the body leaves a light
           // rim on the lit side and a dark rim on the far side
-          if (p.bevel > 0) {
+          if (p.bevel > 0 && ambient) {
+            // ambient: an even raised edge all round, a dark rim at the very edge and a light band just inside it
+            const b = p.bevelSize;
+            g.save(); body(); g.clip('evenodd'); g.lineJoin = 'round';
+            g.lineWidth = b * 2; g.strokeStyle = `rgba(255,255,255,${0.45 * p.bevel})`; body(); g.stroke();
+            g.lineWidth = b * 0.9; g.strokeStyle = `rgba(0,0,0,${0.45 * p.bevel})`; body(); g.stroke();
+            g.restore();
+          } else if (p.bevel > 0) {
             const b = p.bevelSize;
             g.save(); body(); g.clip('evenodd'); g.lineJoin = 'round'; g.lineWidth = b * 2;
             g.save(); g.translate(lx * b * 0.55, ly * b * 0.55); g.strokeStyle = `rgba(0,0,0,${0.55 * p.bevel})`; body(); g.stroke(); g.restore();
@@ -345,12 +355,13 @@
             g.beginPath(); g.rect(-4, -4, 8, 8); shapeFn(g, p); g.fillStyle = '#000'; g.fill('evenodd');
             g.restore();
           }
-          // specular: a soft bright spot toward the light
+          // specular: a soft bright spot toward the light (ambient: a dimmer, wider sheen in the middle)
           if (p.specular > 0 && !outlineOnly) {
             g.save(); body(); g.clip('evenodd');
-            const sx0 = lx * m.half * 0.42, sy0 = ly * (m.bottom - m.top) * 0.24 + (m.top + m.bottom) / 2 * 0.3, rs = Math.min(m.half, (m.bottom - m.top) / 2) * 0.55;
+            const sk = ambient ? 0.55 * p.specular : p.specular;
+            const sx0 = lx * m.half * 0.42, sy0 = ly * (m.bottom - m.top) * 0.24 + (m.top + m.bottom) / 2 * 0.3, rs = Math.min(m.half, (m.bottom - m.top) / 2) * (ambient ? 0.75 : 0.55);
             const gr = g.createRadialGradient(sx0, sy0, 0, sx0, sy0, rs);
-            gr.addColorStop(0, `rgba(255,255,255,${0.85 * p.specular})`); gr.addColorStop(0.35, `rgba(255,255,255,${0.3 * p.specular})`); gr.addColorStop(1, 'rgba(255,255,255,0)');
+            gr.addColorStop(0, `rgba(255,255,255,${0.85 * sk})`); gr.addColorStop(0.35, `rgba(255,255,255,${0.3 * sk})`); gr.addColorStop(1, 'rgba(255,255,255,0)');
             g.fillStyle = gr; g.fillRect(-m.half - 1, m.top - 1, 2 * m.half + 2, m.bottom - m.top + 2);
             g.restore();
           }

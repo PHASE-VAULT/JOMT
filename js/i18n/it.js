@@ -855,6 +855,7 @@ UGTG.addLang('it', {
   "Graphite gradient": "Gradiente grafite",
   "Grass": "Erba",
   "Grass Billboard": "Billboard d'erba",
+  "Tree Impostor": "Impostor d'albero",
   "Grass card": "Card d'erba",
   "Grass tuft card": "Card ciuffo d'erba",
   "Grass tufts (top-down)": "Ciuffi d'erba (dall'alto)",

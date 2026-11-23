@@ -19,7 +19,7 @@
     name: 'Cobblestone',
     desc: 'Tileable cobblestones: irregular, coursed, setts or round river stones with filler pebbles, chips, moss, mud and puddles',
     uses: ['Albedo and height textures for old-town streets, castle courtyards, garden paths and river beds; the height output drives the normal map mode or parallax / displacement.', 'Ground tiles for top-down, strategy and medieval games.'],
-    tags: ['Texturing', 'Nature'],
+    tags: ['PBR', 'Nature'],
     tileable: true,
     heightMap: true,
     icon: U.icon('<path d="M4 6c2-2 5-2 6 0 1 3-1 5-3 5S3 9 4 6z"/><path d="M13 5c3-1 6 0 6 3s-2 4-4 3-4-4-2-6z"/><path d="M5 15c2-2 6-1 6 2s-3 4-5 3-2-3-1-5z"/><path d="M14 14c2-1 5 0 5 3s-3 3-5 2-2-4 0-5z"/>'),

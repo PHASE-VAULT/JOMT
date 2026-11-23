@@ -199,6 +199,7 @@
   function facets(c, p, sh, k, W, H) {
     if (!sh.fv || (p.facets <= 0 && p.facetLines <= 0)) return;
     const fv = sh.fv, a = (p.lightAngle * Math.PI) / 180, Lt = norm3([Math.cos(a), Math.sin(a), 1.1]);
+    const ambient = p.lightMode === 'ambient';
     // face normals (z up); faces are flat polygons, the first three vertices (center + crease corner + next) span the plane
     const nrm = sh.faces.map((f) => {
       const [A, B, C] = f.slice(0, 3).map((i) => fv[i]);
@@ -213,7 +214,8 @@
       lc.lineJoin = 'round'; lc.lineWidth = 1.5; // each face also stroked in its own tone: no anti-alias seams between faces
       sh.faces.forEach((f, fi) => {
         const n = nrm[fi];
-        const s = n[0] * Lt[0] + n[1] * Lt[1] + n[2] * Lt[2] - Lt[2]; // 0 = same as a flat face
+        // 0 = same as a flat face; ambient: only the steepness counts, steeper faces darken whichever way they face
+        const s = ambient ? (n[2] - 1) * 1.2 : n[0] * Lt[0] + n[1] * Lt[1] + n[2] * Lt[2] - Lt[2];
         const t = (s > 0 ? s * 2.2 : s * 1.4) * p.facets;
         const g = Math.round(255 * Math.min(1, Math.max(0, 0.5 + 0.5 * t)));
         lc.fillStyle = lc.strokeStyle = `rgb(${g},${g},${g})`;
@@ -253,28 +255,33 @@
   /* inner highlight / inner shadow / gloss, all clipped to the shape */
   function shading(c, p, sh, k, W, H) {
     const a = (p.lightAngle * Math.PI) / 180, L = [Math.cos(a), Math.sin(a)];
-    let outside = null;
+    // ambient light: no offset, so highlight and inner shadow run evenly along every edge
+    const ambient = p.lightMode === 'ambient', off = ambient ? 0 : 1;
+    // the mask is everything outside the shape, grown inward by `inset` px
+    const mask = (inset) => {
+      const m = U.canvas(W, H), oc = m.getContext('2d');
+      oc.fillRect(0, 0, W, H);
+      oc.globalCompositeOperation = 'destination-out';
+      oc.fill(sh.path, sh.rule);
+      if (inset > 0) { oc.globalCompositeOperation = 'source-over'; oc.lineWidth = 2 * inset; oc.lineJoin = 'round'; oc.stroke(sh.path); }
+      return m;
+    };
     // dir -1: offset away from the light (lit edges), +1: toward the light (shadowed edges)
-    const inner = (color, alpha, size, dir) => {
+    const inner = (color, alpha, size, dir, inset) => {
       if (alpha <= 0 || size <= 0) return;
-      if (!outside) {
-        outside = U.canvas(W, H);
-        const oc = outside.getContext('2d');
-        oc.fillRect(0, 0, W, H);
-        oc.globalCompositeOperation = 'destination-out';
-        oc.fill(sh.path, sh.rule);
-      }
       c.save();
       c.clip(sh.path, sh.rule);
       c.shadowColor = U.rgba(color, alpha);
       c.shadowBlur = size * k;
-      c.shadowOffsetX = dir * L[0] * size * k * 0.6;
-      c.shadowOffsetY = dir * L[1] * size * k * 0.6;
-      c.drawImage(outside, 0, 0); // the mask itself is clipped away; only its shadow lands inside
+      c.shadowOffsetX = off * dir * L[0] * size * k * 0.6;
+      c.shadowOffsetY = off * dir * L[1] * size * k * 0.6;
+      c.drawImage(mask(inset), 0, 0); // the mask itself is clipped away; only its shadow lands inside
       c.restore();
     };
-    inner(p.hlColor, p.highlight, p.hlSize, -1);
-    inner('#000000', p.innerShadow, p.isSize, 1);
+    // ambient with both on: the highlight sits a little inside the dark edge instead of under it (an even bevel)
+    const hlInset = ambient && p.innerShadow > 0 ? p.isSize * k * 0.4 : 0;
+    inner(p.hlColor, p.highlight, p.hlSize, -1, hlInset);
+    inner('#000000', p.innerShadow, p.isSize, 1, 0);
 
     if (p.gloss > 0) {
       const [x0, y0, x1, y1] = sh.box, mid = y0 + (y1 - y0) * 0.5;
@@ -351,7 +358,8 @@
       { key: 'facetLineColor', label: 'Facet line color', type: 'color', default: '#ffffff', show: (p) => p.facetLines > 0 && !CENTERED.includes(p.shape) },
 
       { type: 'section', label: 'Shading' },
-      { key: 'lightAngle', label: 'Light direction', type: 'range', min: -180, max: 180, step: 1, default: -135, show: (p) => shadeOn(p) || p.facets > 0, tip: '-135 = light from top-left' },
+      { key: 'lightMode', label: 'Light', type: 'select', default: 'angled', options: [['angled', 'Angled (light angle)'], ['ambient', 'Ambient (soft, no direction)']], show: (p) => shadeOn(p) || p.facets > 0, tip: 'Ambient: soft light from all around: the inner highlight and inner shadow run evenly along every edge and steeper facets darken evenly, whichever way they face' },
+      { key: 'lightAngle', label: 'Light direction', type: 'range', min: -180, max: 180, step: 1, default: -135, show: (p) => (shadeOn(p) || p.facets > 0) && p.lightMode !== 'ambient', tip: '-135 = light from top-left' },
       { key: 'highlight', label: 'Inner highlight', type: 'range', min: 0, max: 1, step: 0.01, default: 0 },
       { key: 'hlSize', label: 'Highlight size', type: 'range', min: 0.25, max: 8, step: 0.25, default: 2, show: (p) => p.highlight > 0 },
       { key: 'hlColor', label: 'Highlight color', type: 'color', default: '#ffffff', show: (p) => p.highlight > 0 },

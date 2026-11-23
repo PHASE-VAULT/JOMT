@@ -17,7 +17,7 @@
     name: 'Tiles & Bricks',
     desc: 'Tileable bricks, tiles and pavers with bond patterns, mortar, bevel, chipping and color variation',
     uses: ['Albedo and height textures for walls, floors and facades in 3D environments; pair the height output with the normal map mode for lit surfaces.', 'Wall and floor tiles for 2D games and level-editor tile sets.'],
-    tags: ['Texturing'],
+    tags: ['PBR'],
     tileable: true,
     icon: U.icon('<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9.3h18M3 14.6h18M9 4v5.3M15 9.3v5.3M9 14.6V20"/>'),
     params: [

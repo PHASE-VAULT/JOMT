@@ -66,6 +66,8 @@
       const sx = W / n, mesh = MESH.has(p.type);
       const ny = mesh ? Math.max(1, Math.round(H / sx)) : 1, sy = mesh ? H / ny : H; // mesh: square-ish cells that tile vertically
       const hw = (p.thick * k) / 2;
+      // wire coverage never thinner than one pixel: below ~128 px thin wires fell between the pixel centers and vanished (empty cutout)
+      const hwc = Math.max(0.5, hw);
       const c1 = U.hex(p.color), c2 = U.hex(p.color2), rc = U.hex(p.rustColor);
       const noise = (x, y, f, s) => U.fractal('perlin', (x / W) * f, (y / H) * Math.max(1, Math.round((f * H) / W)), f, Math.max(1, Math.round((f * H) / W)), 4, 0.5, 'fbm', seed + s);
       const cov = (d, w) => clamp(w - d + 0.5); // anti-aliased coverage of a band of half-width w
@@ -92,7 +94,7 @@
             // two diamond wire families; at crossings one runs over the other (alternating weave)
             const u = px / sx, v = py / sy;
             const d1 = Math.abs(U.mod(u + v + 0.5, 1) - 0.5) * sx * 0.7071, d2 = Math.abs(U.mod(u - v + 0.5, 1) - 0.5) * sx * 0.7071;
-            const a1 = cov(d1, hw), a2 = cov(d2, hw);
+            const a1 = cov(d1, hwc), a2 = cov(d2, hwc);
             const over1 = (Math.floor(u + v + 0.5) + Math.floor(u - v + 0.5)) % 2 === 0;
             const top = over1 ? [a1, d1] : [a2, d2], bot = over1 ? [a2, d2] : [a1, d1];
             a = Math.max(a1, a2);
@@ -101,20 +103,20 @@
           }
           case 'weld': {
             const dx = Math.abs(U.mod(px / sx + 0.5, 1) - 0.5) * sx, dy = Math.abs(U.mod(py / sy + 0.5, 1) - 0.5) * sy;
-            a = Math.max(cov(dx, hw), cov(dy, hw));
+            a = Math.max(cov(dx, hwc), cov(dy, hwc));
             light = Math.max(dx < hw ? tube(dx, hw) : 0, dy < hw ? tube(dy, hw) : 0);
             if (dx < hw && dy < hw) light *= 0.85; // weld nodes
             break;
           }
           case 'hex': {
             const d = hex(U.mod(px, W), U.mod(py * hyScale, hRows * Math.sqrt(3) * R));
-            a = cov(d, hw); light = tube(d, hw);
+            a = cov(d, hwc); light = tube(d, hw);
             break;
           }
           case 'lattice': {
             const u = px / sx, v = py / sy;
             const d1 = Math.abs(U.mod(u + v + 0.5, 1) - 0.5) * sx * 0.7071, d2 = Math.abs(U.mod(u - v + 0.5, 1) - 0.5) * sx * 0.7071;
-            const a1 = cov(d1, hw), a2 = cov(d2, hw);
+            const a1 = cov(d1, hwc), a2 = cov(d2, hwc);
             a = Math.max(a1, a2); wood = true;
             const onTop = a1 >= a2 ? d1 : d2;
             light = 1 - p.shade * 0.4 * smoothstep(hw * 0.6, hw, onTop);
@@ -150,7 +152,7 @@
             const lx = (U.mod(px / sx, 1) - 0.5) * sx, top0 = p.topY * H;
             // bars run up into the spear heads, so the tips never float
             const barTop = p.spears ? top0 - hw * 4 : top0;
-            const bar = Math.min(cov(Math.abs(lx), hw), cov(barTop - py, 0));
+            const bar = Math.min(cov(Math.abs(lx), hwc), cov(barTop - py, 0));
             let tip = 0;
             if (p.spears) {
               // spear head above the top: a diamond around the bar's top end
@@ -182,7 +184,7 @@
             const per = W / Math.max(1, n * 3), ph = (px / per) * U.TAU;
             const w1 = Math.sin(ph) * hw * 1.2, w2 = -Math.sin(ph) * hw * 1.2;
             const d1 = Math.abs(ly - w1), d2 = Math.abs(ly - w2);
-            a = Math.max(cov(d1, hw), cov(d2, hw));
+            a = Math.max(cov(d1, hwc), cov(d2, hwc));
             light = tube(Math.min(d1, d2), hw);
             // barbs: short twisted spikes every few periods
             const bx = U.mod(px, W / n) - W / n / 2;

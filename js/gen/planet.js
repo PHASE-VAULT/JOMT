@@ -115,13 +115,14 @@
       { key: 'clouds', label: 'Clouds', type: 'range', min: 0, max: 1, step: 0.01, default: 0.45 },
       { key: 'cloudColor', label: 'Cloud color', type: 'color', default: '#ffffff', show: (p) => p.clouds > 0 },
       { key: 'cloudScale', label: 'Cloud scale', type: 'range', min: 0.3, max: 6, step: 0.05, default: 2, show: (p) => p.clouds > 0 },
-      { key: 'cities', label: 'City lights', type: 'range', min: 0, max: 1, step: 0.01, default: 0, tip: 'Lights on the night side (land only)' },
-      { key: 'cityColor', label: 'Light color', type: 'color', default: '#ffc46a', show: (p) => p.cities > 0 },
+      { key: 'cities', label: 'City lights', type: 'range', min: 0, max: 1, step: 0.01, default: 0, show: (p) => p.lightMode !== 'ambient', tip: 'Lights on the night side (land only)' },
+      { key: 'cityColor', label: 'Light color', type: 'color', default: '#ffc46a', show: (p) => p.cities > 0 && p.lightMode !== 'ambient' },
       { type: 'section', label: 'Lighting' },
-      { key: 'lightAngle', label: 'Light direction', type: 'range', min: -180, max: 180, step: 1, default: 35, tip: 'Where the light comes from on screen (0 = right, 90 = top)' },
-      { key: 'phase', label: 'Phase', type: 'range', min: 0, max: 180, step: 1, default: 55, tip: '0 = fully lit (light behind the viewer), 90 = half, 180 = backlit crescent' },
-      { key: 'terminator', label: 'Terminator softness', type: 'range', min: 0.01, max: 0.6, step: 0.01, default: 0.12 },
-      { key: 'ambient', label: 'Night side brightness', type: 'range', min: 0, max: 0.5, step: 0.01, default: 0.04 },
+      { key: 'lightMode', label: 'Light', type: 'select', default: 'angled', options: [['angled', 'Angled (light angle)'], ['ambient', 'Ambient (soft, no direction)']], tip: 'Ambient: soft light from all around: the whole disc is evenly lit with no night side (so no city lights), only a gentle darkening toward the limb; craters and relief shade evenly' },
+      { key: 'lightAngle', label: 'Light direction', type: 'range', min: -180, max: 180, step: 1, default: 35, show: (p) => p.lightMode !== 'ambient', tip: 'Where the light comes from on screen (0 = right, 90 = top)' },
+      { key: 'phase', label: 'Phase', type: 'range', min: 0, max: 180, step: 1, default: 55, show: (p) => p.lightMode !== 'ambient', tip: '0 = fully lit (light behind the viewer), 90 = half, 180 = backlit crescent' },
+      { key: 'terminator', label: 'Terminator softness', type: 'range', min: 0.01, max: 0.6, step: 0.01, default: 0.12, show: (p) => p.lightMode !== 'ambient' },
+      { key: 'ambient', label: 'Night side brightness', type: 'range', min: 0, max: 0.5, step: 0.01, default: 0.04, show: (p) => p.lightMode !== 'ambient' },
       { key: 'atm', label: 'Atmosphere', type: 'range', min: 0, max: 1.5, step: 0.01, default: 0.6 },
       { key: 'atmColor', label: 'Atmosphere color', type: 'color', default: '#5aa8ff', show: (p) => p.atm > 0 },
       { key: 'atmSize', label: 'Atmosphere thickness', type: 'range', min: 0.01, max: 0.4, step: 0.005, default: 0.06, show: (p) => p.atm > 0, tip: 'Fraction of the radius' },
@@ -159,6 +160,9 @@
       const C = [p.c1, p.c2, p.c3, p.c4, p.c5].map(U.hex), cloudC = U.hex(p.cloudColor), atmC = U.hex(p.atmColor), cityC = U.hex(p.cityColor), glowC = U.hex(p.glowColor), ringC = U.hex(p.ringColor);
       // light: screen x right, y up, z toward the viewer
       const la = p.lightAngle * RAD, ph = p.phase * RAD, L = [Math.sin(ph) * Math.cos(la), Math.sin(ph) * Math.sin(la), Math.cos(ph)];
+      // ambient light (from all around): an evenly lit disc with no terminator / night side. City lights only
+      // exist on the night side, so they are off; lava glows evenly; relief shades by cavity, not by direction
+      const ambient = p.lightMode === 'ambient';
       const tz = p.tilt * RAD, sp = p.spin * RAD, ctz = Math.cos(tz), stz = Math.sin(tz), csp = Math.cos(sp), ssp = Math.sin(sp);
       const toPlanet = (x, y, z) => {
         // undo the axial tilt (around the view axis), then spin around the planet's own axis
@@ -268,7 +272,7 @@
             const ca = smoothstep(0.62 - p.clouds * 0.25, 0.8 - p.clouds * 0.2, cn) * Math.min(1, p.clouds * 1.4);
             CA[j] = ca; land *= 1 - ca;
           }
-          if (p.cities > 0 && land > 0.5) {
+          if (p.cities > 0 && land > 0.5 && !ambient) {
             const night = 1 - smoothstep(-0.05, 0.15, x * L0 + y * L1 + z * L2);
             if (night > 0) {
               const cn = fbm3(q[0] * 30, q[1] * 30, q[2] * 30, 2, seed + 51), ct = fbm3(q[0] * 4, q[1] * 4, q[2] * 4, 2, seed + 52);
@@ -296,33 +300,39 @@
           if (INS[j]) {
             const z = Math.sqrt(1 - r2), nl = x * L0 + y * L1 + z * L2, k3 = j * 3;
             planetZ = z;
-            let shade = smoothstep(-p.terminator, p.terminator, nl) * (0.35 + 0.65 * Math.max(0, nl));
-            // relief: compare the height a little toward the light (the same step on the sphere, read from the buffer)
-            if (relief) {
+            // ambient: only a gentle darkening toward the limb (centre ≈ the lit side in angled mode)
+            let shade = ambient ? 0.9 * Math.max(0.5, 1 - (1 - z * z) * 0.45) : smoothstep(-p.terminator, p.terminator, nl) * (0.35 + 0.65 * Math.max(0, nl));
+            if (relief && ambient) {
+              // ambient relief: lower than the surroundings (crater bowls, valleys) = darker, ridges a little brighter
+              const s = e * R * 1.5, h0 = HB[j];
+              const hm = (hAt(px + 0.5 + s, py + 0.5, h0) + hAt(px + 0.5 - s, py + 0.5, h0) + hAt(px + 0.5, py + 0.5 + s, h0) + hAt(px + 0.5, py + 0.5 - s, h0)) / 4;
+              shade *= clamp(1 + (h0 - hm) * p.relief * 50, 0.5, 1.3);
+            } else if (relief) {
+              // relief: compare the height a little toward the light (the same step on the sphere, read from the buffer)
               const tx = L0 - x * nl, ty = L1 - y * nl, tzv = L2 - z * nl, tl = Math.hypot(tx, ty, tzv) || 1;
               const h2 = hAt(px + 0.5 + (tx / tl) * e * R, py + 0.5 - (ty / tl) * e * R, HB[j]);
               shade *= clamp(1 + (h2 - HB[j]) * p.relief * 40, 0.4, 1.6);
             }
-            const lit = p.ambient + (1 - p.ambient) * shade;
+            const lit = ambient ? shade : p.ambient + (1 - p.ambient) * shade; // no night side to brighten in ambient
             cr = COL[k3] * lit; cg = COL[k3 + 1] * lit; cb = COL[k3 + 2] * lit;
             const ca = CA[j];
             if (ca > 0) { cr = lerp(cr, cloudC[0] * lit, ca); cg = lerp(cg, cloudC[1] * lit, ca); cb = lerp(cb, cloudC[2] * lit, ca); }
             const ct = CT[j];
             if (ct > 0) { cr += cityC[0] * ct; cg += cityC[1] * ct; cb += cityC[2] * ct; }
             if (EM) {
-              const night = 1 - smoothstep(-0.05, 0.15, nl), em = 0.4 + 0.6 * night;
+              const night = 1 - smoothstep(-0.05, 0.15, nl), em = ambient ? 0.55 : 0.4 + 0.6 * night;
               cr += EM[k3] * em; cg += EM[k3 + 1] * em; cb += EM[k3 + 2] * em;
             }
             // atmosphere: fresnel rim, scattering on the lit side
             if (p.atm > 0) {
-              const fres = Math.pow(1 - z, 3) * p.atm, sl = smoothstep(-0.3, 0.5, nl), fk = fres * (0.15 + sl), hz = p.atm * 0.12 * sl * (1 - z);
+              const fres = Math.pow(1 - z, 3) * p.atm, sl = ambient ? 0.65 : smoothstep(-0.3, 0.5, nl), fk = fres * (0.15 + sl), hz = p.atm * 0.12 * sl * (1 - z);
               cr = lerp(cr + atmC[0] * fk, atmC[0], hz); cg = lerp(cg + atmC[1] * fk, atmC[1], hz); cb = lerp(cb + atmC[2] * fk, atmC[2], hz);
             }
             a = 1;
           } else if (p.atm > 0 && r < 1 + p.atmSize && r2 >= 1) {
             // outer glow beyond the limb, brighter where the limb faces the light
             const t = (r - 1) / p.atmSize, nl = (x / r) * L0 + (y / r) * L1;
-            const g = Math.pow(1 - t, 2.2) * p.atm * (0.12 + smoothstep(-0.35, 0.45, nl + L2 * 0.3));
+            const g = Math.pow(1 - t, 2.2) * p.atm * (0.12 + (ambient ? 0.6 : smoothstep(-0.35, 0.45, nl + L2 * 0.3))); // ambient: even all round
             cr = atmC[0]; cg = atmC[1]; cb = atmC[2]; a = clamp(g);
           }
           // rings: plane through the center, tilted toward the viewer
@@ -339,8 +349,8 @@
                 if (Math.abs(t - 0.62) < 0.025) ra *= 0.15; // a gap
                 // the planet's shadow on the far part of the rings: points behind the planet on the side away from the light
                 const along = x * L0 + y * L1, perp = Math.hypot(x - L0 * along, y - L1 * along);
-                const inShadow = ringZ < 0 && along < 0 && perp < 1;
-                const rl = (inShadow ? 0.25 : 1) * (0.35 + 0.65 * Math.max(0.2, L2 * 0.5 + 0.5));
+                const inShadow = !ambient && ringZ < 0 && along < 0 && perp < 1; // ambient: no planet shadow on the rings
+                const rl = (inShadow ? 0.25 : 1) * (ambient ? 0.85 : 0.35 + 0.65 * Math.max(0.2, L2 * 0.5 + 0.5));
                 const rr0 = ringC[0] * rl, rg0 = ringC[1] * rl, rb0 = ringC[2] * rl;
                 // straight (un-premultiplied) color: over nothing the ring keeps its own color
                 if (a <= 0) { cr = rr0; cg = rg0; cb = rb0; a = ra; }

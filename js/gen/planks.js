@@ -89,7 +89,7 @@
     name: 'Plank Floor',
     desc: 'Tileable plank floors and decking in random, offset, herringbone or basket-weave layouts with height map',
     uses: ['Wooden floor, deck and dock materials for interiors and exteriors in 3D scenes.', 'Wooden backgrounds and panels for UI and 2D games.'],
-    tags: ['Texturing'],
+    tags: ['PBR'],
     tileable: true,
     heightMap: true,
     icon: U.icon('<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9.3h18M3 14.7h18M11 4v5.3M7 9.3v5.4M15 9.3v5.4M12 14.7V20"/>'),
@@ -98,8 +98,7 @@
       { key: 'pattern', label: 'Pattern', type: 'select', default: 'random', options: [['random', 'Random lengths'], ['brick', 'Half offset'], ['third', 'Third offset'], ['stack', 'Stacked'], ['herringbone', 'Herringbone'], ['basket', 'Basket weave (parquet)']] },
       { key: 'direction', label: 'Direction', type: 'select', default: 'horizontal', options: [['horizontal', 'Horizontal'], ['vertical', 'Vertical']] },
       { key: 'rows', label: 'Boards across', type: 'int', min: 2, max: 40, default: 6, tip: 'Number of board widths across the texture (rounded so the pattern tiles)' },
-      { key: 'lenMin', label: 'Min length', type: 'range', min: 1, max: 30, step: 0.1, default: 4, show: (p) => p.pattern === 'random', tip: 'In board widths' },
-      { key: 'lenMax', label: 'Max length', type: 'range', min: 1, max: 30, step: 0.1, default: 11, show: (p) => p.pattern === 'random', tip: 'In board widths' },
+      { key: 'lenMin', key2: 'lenMax', label: 'Length', type: 'span', min: 1, max: 30, step: 0.1, default: 4, default2: 11, show: (p) => p.pattern === 'random', tip: 'In board widths' },
       { key: 'boardLen', label: 'Board length', type: 'range', min: 1, max: 30, step: 0.1, default: 7, show: (p) => ['brick', 'third', 'stack'].includes(p.pattern), tip: 'In board widths (rounded so the row tiles)' },
       { key: 'ratio', label: 'Length / width', type: 'int', min: 2, max: 8, default: 4, show: (p) => p.pattern === 'herringbone' || p.pattern === 'basket', tip: 'Herringbone: board length in widths. Basket: boards per square' },
       { key: 'seed', label: 'Seed', type: 'seed', default: 7 },
@@ -150,8 +149,11 @@
         for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) g[j * gw + i] = U.fractal('perlin', (i / gw) * f, (j / gh) * fy, f, fy, 4, 0.5, 'fbm', seed + s);
         return (x, y) => {
           const X = (x / W) * gw - 0.5, Y = (y / H) * gh - 0.5, i0 = Math.floor(X), j0 = Math.floor(Y), tx = X - i0, ty = Y - j0;
-          const at = (i, j) => g[U.mod(j, gh) * gw + U.mod(i, gw)];
-          return lerp(lerp(at(i0, j0), at(i0 + 1, j0), tx), lerp(at(i0, j0 + 1), at(i0 + 1, j0 + 1), tx), ty);
+          // whole-number wrap (one % per axis, same result as U.mod), each row / column wrapped once
+          let ia = i0 % gw; if (ia < 0) ia += gw;
+          let ja = j0 % gh; if (ja < 0) ja += gh;
+          const ib = ia + 1 === gw ? 0 : ia + 1, ra = ja * gw, rb = (ja + 1 === gh ? 0 : ja + 1) * gw;
+          return lerp(lerp(g[ra + ia], g[ra + ib], tx), lerp(g[rb + ia], g[rb + ib], tx), ty);
         };
       };
       const wearN = p.wear > 0 ? coarse(31, 4) : null, dirtN = p.dirt > 0 ? coarse(41, 6) : null;

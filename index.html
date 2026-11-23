@@ -82,14 +82,20 @@
         <canvas id="animView"></canvas>
         <span id="animLabel"></span>
       </div>
-      <div class="gl-box" id="glBox" hidden>
-        <div class="gl-head">
-          <span data-i18n>Refraction preview</span>
-          <button class="gl-fold" type="button" title="Show / hide the preview settings" data-i18n-title>⚙</button>
-        </div>
+      <div class="gl-box main" id="glBox" hidden>
         <canvas id="glView" width="240" height="240"></canvas>
         <div class="gl-nogl" data-i18n>WebGL is not available in this browser.</div>
-        <div class="gl-ctl"></div>
+        <div class="gl-side">
+          <div class="gl-head">
+            <span class="gl-title" data-i18n>Refraction preview</span>
+            <span class="gl-btns">
+              <button class="gl-fold gl-swap" type="button" title="Swap: refraction preview large or the texture large" data-i18n-title>⇄</button>
+              <button class="gl-fold gl-gear" type="button" title="Show / hide the preview settings" data-i18n-title>⚙</button>
+            </span>
+          </div>
+          <div class="gl-tex-wrap"><canvas id="glTex"></canvas><span data-i18n>Texture</span></div>
+          <div class="gl-ctl"></div>
+        </div>
       </div>
       <div class="statusbar">
         <span id="statusInfo"></span>
@@ -190,9 +196,17 @@
   <script src="js/i18n/es.js"></script>
   <script src="js/i18n/it.js"></script>
   <script src="js/i18n/generators.js"></script>
+  <script src="js/i18n/features.js"></script>
+  <script src="js/i18n/features2.js"></script>
+  <script src="js/i18n/features3.js"></script>
+  <script src="js/i18n/bark.js"></script>
+  <script src="js/i18n/polymer.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/search.js"></script>
   <script src="js/normal.js"></script>
   <script src="js/smooth.js"></script>
+  <script src="js/metal.js"></script>
+  <script src="js/post.js"></script>
   <script src="js/sheet.js"></script>
   <script src="js/wear.js"></script>
   <script src="js/bar.js"></script>
@@ -201,6 +215,7 @@
   <!-- generators, in grid order: grouped roughly by output type -->
   <!-- surfaces & materials -->
   <script src="js/gen/pattern.js"></script>
+  <script src="js/gen/proto-grid.js"></script>
   <script src="js/gen/noise.js"></script>
   <script src="js/gen/bricks.js"></script>
   <script src="js/gen/planks.js"></script>
@@ -209,16 +224,16 @@
   <script src="js/gen/cobblestone.js"></script>
   <script src="js/gen/rock.js"></script>
   <script src="js/gen/moss.js"></script>
+  <script src="js/gen/bark.js"></script>
   <script src="js/gen/sand.js"></script>
   <script src="js/gen/gravel.js"></script>
   <script src="js/gen/mud.js"></script>
   <!-- from the JOMT-main download, to sort out later -->
-  <script src="js/gen/sand-dl.js"></script>
-  <script src="js/gen/gravel-dl.js"></script>
-  <script src="js/gen/mud-dl.js"></script>
   <script src="js/gen/dirt.js"></script>
   <script src="js/gen/rubber-floor.js"></script>
   <script src="js/gen/material.js"></script>
+  <script src="js/gen/metal-surface.js"></script>
+  <script src="js/gen/polymer.js"></script>
   <script src="js/gen/camo.js"></script>
   <script src="js/gen/weapon-skin.js"></script>
   <script src="js/gen/solar.js"></script>
@@ -240,7 +255,8 @@
   <script src="js/gen/gradient.js"></script>
   <!-- decals -->
   <script src="js/gen/splatter.js"></script>
-  <script src="js/gen/splatter-dl.js"></script>
+  <script src="js/gen/footprints.js"></script>
+  <script src="js/gen/cobweb.js"></script>
   <script src="js/gen/blood-pool.js"></script>
   <script src="js/gen/graffiti.js"></script>
   <script src="js/gen/impact.js"></script>
@@ -249,11 +265,18 @@
   <!-- foliage cards -->
   <script src="js/gen/grass-billboard.js"></script>
   <script src="js/gen/leaves.js"></script>
+  <script src="js/gen/tree-impostor.js"></script>
   <script src="js/gen/fence.js"></script>
   <!-- vfx -->
   <script src="js/gen/particle.js"></script>
   <script src="js/gen/muzzle-front.js"></script>
   <script src="js/gen/muzzle-side.js"></script>
+  <script src="js/gen/fire-sheet.js"></script>
+  <script src="js/gen/smoke-sheet.js"></script>
+  <script src="js/gen/flyer.js"></script>
+  <script src="js/gen/aircraft.js"></script>
+  <script src="js/gen/skyline.js"></script>
+  <script src="js/gen/mountains.js"></script>
   <script src="js/gen/lightning.js"></script>
   <script src="js/gen/lens-flare.js"></script>
   <script src="js/gen/rainbow.js"></script>
@@ -275,6 +298,8 @@
   <script src="js/gen/radial-bar.js"></script>
   <script src="js/gen/shape-bar.js"></script>
   <script src="js/gen/organ.js"></script>
+  <script src="js/gen/blood-ui.js"></script>
+  <script src="js/gen/camera-ui.js"></script>
   <script src="js/gen/symbol.js"></script>
   <!-- aim & hud -->
   <script src="js/gen/crosshair.js"></script>

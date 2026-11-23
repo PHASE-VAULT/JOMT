@@ -120,8 +120,7 @@
       { key: 'bgTransparent', label: 'Transparent background', type: 'bool', default: false },
       { key: 'bgValue', label: 'Background value', type: 'range', min: 0, max: 1, step: 0.01, default: 0.25, show: (p) => !p.bgTransparent },
       { key: 'normalize', label: 'Normalize first', type: 'bool', default: false, tip: 'Stretch the rendered darkest..brightest to 0..1 before remapping' },
-      { key: 'remapMin', label: 'Remap min', type: 'range', min: 0, max: 1, step: 0.01, default: 0, tip: 'Output for black. Min > max inverts' },
-      { key: 'remapMax', label: 'Remap max', type: 'range', min: 0, max: 1, step: 0.01, default: 1, tip: 'Output for white' },
+      { key: 'remapMin', key2: 'remapMax', label: 'Remap', type: 'span', min: 0, max: 1, step: 0.01, default: 0, default2: 1, cross: true, tip: 'Output for black … output for white. Drag the handles past each other to invert' },
     ],
     presets: [
       // ref 1: dense tangle of thin circle outlines

@@ -17,7 +17,7 @@
     name: 'Wood / Marble / Rust',
     desc: 'Tileable wood grain, marble veins and rusted metal with presets for wood species, marbles and corrosion',
     uses: ['Base materials for furniture, floors, countertops and rusted props in 3D scenes.', 'Background textures for UI panels, cards and print designs.'],
-    tags: ['Texturing', 'Nature'],
+    tags: ['PBR', 'Nature'],
     tileable: true,
     icon: U.icon('<rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9c4 1.5 9-1.5 17 0M3.5 14c5 1 10-2 17 .5"/>'),
     params: [

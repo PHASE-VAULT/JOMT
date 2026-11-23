@@ -196,6 +196,57 @@
         { type: 'disc', radius: 0.8, soft: 0.25, intensity: 0.6 },
         { type: 'disc', radius: 0.3, soft: 0.15, intensity: 0.5 },
       ], falloff: 0.35, noiseType: 'both', noiseAmt: 0.55, noiseScale: 9, seed: 21 } },
+      // Street lights: pools of light on the ground for a downward spotlight. The road runs left – right,
+      // +Y is the street side; the house / pole side (−Y) is cut off as by a real luminaire's back shield
+      { name: 'Sodium cobra-head (road)', group: 'Street lights', values: { layers: [
+        { type: 'rect', radius: 0.86, aspect: 0.55, corner: 0.5, soft: 0.34, intensity: 0.8, y: 0.12 },
+        { type: 'disc', radius: 0.34, soft: 0.3, intensity: 0.2, y: 0.06 },
+        { type: 'rect', blend: 'subtract', radius: 1, aspect: 0.4, corner: 0, soft: 0.3, intensity: 0.6, y: -0.58 },
+      ], falloff: 0.35, power: 1.2, noiseType: 'streaks', noiseAmt: 0.05, noiseScale: 18 } },
+      { name: 'LED streetlight (full cutoff)', group: 'Street lights', values: { layers: [
+        { type: 'rect', radius: 0.82, aspect: 0.56, corner: 0.36, soft: 0.12, intensity: 0.82 },
+        { type: 'rect', radius: 0.48, aspect: 0.62, corner: 0.42, soft: 0.26, intensity: 0.22 },
+        // faint imprint of the LED module grid
+        { type: 'dots', blend: 'multiply', region: 'rect', radius: 0.84, aspect: 0.58, spacing: 0.07, duty: 0.8, soft: 0.12, intensity: 0.06 },
+      ], falloff: 0.25, power: 1.6, noiseType: 'none' } },
+      { name: 'Batwing roadway (two lobes)', group: 'Street lights', values: { layers: [
+        { type: 'disc', radius: 0.48, soft: 0.34, intensity: 0.5, x: -0.32 },
+        { type: 'disc', radius: 0.48, soft: 0.34, intensity: 0.5, x: 0.32 },
+        { type: 'rect', radius: 0.78, aspect: 0.45, corner: 0.5, soft: 0.32, intensity: 0.45 },
+      ], falloff: 0.3, power: 1.4, noiseType: 'streaks', noiseAmt: 0.06, noiseScale: 20 } },
+      { name: 'Parking lot shoebox (square)', group: 'Street lights', values: { layers: [
+        { type: 'rect', radius: 0.76, aspect: 1, corner: 0.35, soft: 0.3, intensity: 0.85 },
+        { type: 'disc', radius: 0.5, soft: 0.5, intensity: 0.15 },
+      ], falloff: 0.3, power: 1.5, noiseType: 'none' } },
+      { name: 'Highway high-mast (wide flood)', group: 'Street lights', values: { layers: [
+        { type: 'rect', radius: 0.9, aspect: 0.78, corner: 0.5, soft: 0.45, intensity: 0.8 },
+        { type: 'disc', radius: 0.36, soft: 0.36, intensity: 0.25 },
+      ], falloff: 0.5, power: 0.9, noiseType: 'none' } },
+      { name: 'Post-top globe (park)', group: 'Street lights', values: { layers: [
+        { type: 'disc', radius: 0.86, soft: 0.46, intensity: 0.92 },
+        { type: 'ring', radius: 0.55, width: 0.08, soft: 0.1, intensity: 0.08 },
+        { type: 'disc', radius: 0.08, soft: 0.08, blend: 'subtract', intensity: 0.25 }, // shadow of the pole top
+      ], falloff: 0.55, power: 1, noiseType: 'grain', noiseAmt: 0.05, noiseScale: 5 } },
+      { name: 'Victorian lantern (cage shadows)', group: 'Street lights', values: { layers: [
+        { type: 'disc', radius: 0.82, soft: 0.36, intensity: 1 },
+        // the lantern's corner bars cast four soft radial shadows, the base a dark spot under the lamp
+        { type: 'spokes', blend: 'subtract', radius: 0.98, width: 0.06, count: 4, duty: 0.14, soft: 0.14, intensity: 0.32, rotation: 45 },
+        { type: 'disc', radius: 0.13, soft: 0.1, blend: 'subtract', intensity: 0.4 },
+      ], falloff: 0.5, power: 1.3, noiseType: 'both', noiseAmt: 0.15, noiseScale: 6 } },
+      { name: 'Wall-mounted alley lamp', group: 'Street lights', values: { layers: [
+        { type: 'disc', radius: 0.84, soft: 0.34, intensity: 0.95, y: 0.16 },
+        { type: 'rect', blend: 'subtract', radius: 1, aspect: 0.5, corner: 0, soft: 0.1, intensity: 1, y: -0.78 }, // the wall
+      ], falloff: 0.4, power: 1.2, noiseType: 'streaks', noiseAmt: 0.05, noiseScale: 12 } },
+      { name: 'Old mercury vapor (dirty)', group: 'Street lights', values: { layers: [
+        { type: 'disc', radius: 0.8, soft: 0.36, intensity: 0.75 },
+        { type: 'ring', radius: 0.34, width: 0.06, soft: 0.06, intensity: 0.12 },
+        { type: 'ring', radius: 0.56, width: 0.06, soft: 0.07, intensity: 0.1 },
+      ], falloff: 0.45, power: 1.2, noiseType: 'both', noiseAmt: 0.35, noiseScale: 7, seed: 4 } },
+      { name: 'Broken street lamp (horror)', group: 'Street lights', values: { layers: [
+        { type: 'disc', radius: 0.72, soft: 0.3, intensity: 0.6 },
+        // cracked, half-hanging housing blocks part of the light
+        { type: 'rect', blend: 'subtract', radius: 0.6, aspect: 0.4, corner: 0.1, soft: 0.2, intensity: 0.45, x: 0.42, y: -0.3, rotation: 25 },
+      ], falloff: 0.4, noiseType: 'both', noiseAmt: 0.6, noiseScale: 9, seed: 31, gamma: 1.3 } },
       // Stylized
       { name: 'Toon spotlight (bands)', group: 'Stylized', values: { layers: [
         { type: 'disc', radius: 0.8, soft: 0, intensity: 0.35 },

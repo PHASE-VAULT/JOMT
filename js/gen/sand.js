@@ -15,7 +15,9 @@
     const xi = Math.floor(x), yi = Math.floor(y);
     let bd = 1e9;
     for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
-      const cx = xi + i, cy = yi + j, wx = U.mod(cx, px), wy = U.mod(cy, py);
+      const cx = xi + i, cy = yi + j; // periods are whole numbers: one % per axis wraps exactly
+      let wx = cx % px; if (wx < 0) wx += px;
+      let wy = cy % py; if (wy < 0) wy += py;
       const dx = x - (cx + U.hash(wx, wy, s)), dy = y - (cy + U.hash(wx, wy, s + 7919)), dd = dx * dx + dy * dy;
       if (dd < bd) { bd = dd; CP.dx = dx; CP.dy = dy; CP.k = wx * 7919 + wy; }
     }
@@ -36,7 +38,7 @@
     name: 'Sand',
     desc: 'Tileable sand with grains, sparkle, dunes, wind ripples, shell fragments, pebbles, wet patches and height map',
     uses: ['Ground materials for beaches, deserts, dunes, seabeds and sandboxes on terrain and level geometry, with a height map for the normal map mode.', 'Top-down sand tiles for 2D and isometric games and backgrounds.'],
-    tags: ['Texturing', 'Nature'],
+    tags: ['PBR', 'Nature'],
     tileable: true,
     heightMap: true,
     icon: U.icon('<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9c3-2 6 2 9 0s6-2 9 0M3 15c3-2 6 2 9 0s6-2 9 0" opacity=".7"/><circle cx="7" cy="12" r=".6" fill="currentColor"/><circle cx="16" cy="18" r=".6" fill="currentColor"/><circle cx="14" cy="6" r=".6" fill="currentColor"/>'),

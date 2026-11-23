@@ -676,7 +676,7 @@ UGTG.addLang('de', { 'Rock & Cliff': 'Fels & Klippe', 'Label corner': 'Beschrift
 UGTG.addLang('fr', { 'Rock & Cliff': 'Roche & falaise', 'Label corner': 'Coin des étiquettes' });
 UGTG.addLang('es', { 'Rock & Cliff': 'Roca y acantilado', 'Label corner': 'Esquina de etiquetas' });
 UGTG.addLang('it', { 'Rock & Cliff': 'Roccia e scogliera', 'Label corner': 'Angolo etichette' });
-/* Blood Pool, Sand, Gravel, Mud & Dirt, Leaves */
+/* Blood Pool, Sand, Gravel, Mud, Leaves */
 UGTG.addLang('de', {
   "Beach sand": "Strandsand",
   "Desert sand": "Wüstensand",
@@ -865,7 +865,7 @@ UGTG.addLang('de', {
   "Hand-painted cobble path": "Handgemalter Kieselweg",
   "Lunar rubble": "Mondgeröll",
   "Alien crystals": "Alien-Kristalle",
-  "Mud & Dirt": "Schlamm & Erde",
+  "Mud": "Schlamm",
   "Tileable dirt, soil and mud with clods, pebbles, dried cracks, wet patches, puddles, tire tracks, twigs and height map": "Kachelbare Erde, Boden und Schlamm mit Klumpen, Kieseln, Trockenrissen, nassen Stellen, Pfützen, Reifenspuren, Zweigen und Height Map",
   "Ground materials for dirt roads, fields, battlefields, trenches, construction sites and forest paths on terrain and level geometry, with a height map for the normal map mode.": "Bodenmaterialien für Feldwege, Äcker, Schlachtfelder, Schützengräben, Baustellen und Waldwege auf Terrain und Level-Geometrie, mit Height Map für den Normal-Map-Modus.",
   "Top-down dirt and mud tiles for 2D and isometric games and backgrounds.": "Erd- und Schlammkacheln in Draufsicht für 2D- und isometrische Spiele und Hintergründe.",
@@ -1211,7 +1211,7 @@ UGTG.addLang('fr', {
   "Hand-painted cobble path": "Chemin de galets peint à la main",
   "Lunar rubble": "Éboulis lunaires",
   "Alien crystals": "Cristaux extraterrestres",
-  "Mud & Dirt": "Boue & terre",
+  "Mud": "Boue",
   "Tileable dirt, soil and mud with clods, pebbles, dried cracks, wet patches, puddles, tire tracks, twigs and height map": "Terre, sol et boue raccordables avec mottes, galets, craquelures sèches, zones mouillées, flaques, traces de pneus, brindilles et carte de hauteur",
   "Ground materials for dirt roads, fields, battlefields, trenches, construction sites and forest paths on terrain and level geometry, with a height map for the normal map mode.": "Matériaux de sol pour chemins de terre, champs, champs de bataille, tranchées, chantiers et sentiers forestiers sur le terrain et la géométrie des niveaux, avec carte de hauteur pour le mode normal map.",
   "Top-down dirt and mud tiles for 2D and isometric games and backgrounds.": "Tuiles de terre et de boue vues de dessus pour jeux 2D et isométriques et arrière-plans.",
@@ -1557,7 +1557,7 @@ UGTG.addLang('es', {
   "Hand-painted cobble path": "Camino de cantos pintado a mano",
   "Lunar rubble": "Escombros lunares",
   "Alien crystals": "Cristales alienígenas",
-  "Mud & Dirt": "Barro y tierra",
+  "Mud": "Barro",
   "Tileable dirt, soil and mud with clods, pebbles, dried cracks, wet patches, puddles, tire tracks, twigs and height map": "Tierra, suelo y barro repetibles con terrones, guijarros, grietas secas, zonas mojadas, charcos, huellas de neumáticos, ramitas y mapa de altura",
   "Ground materials for dirt roads, fields, battlefields, trenches, construction sites and forest paths on terrain and level geometry, with a height map for the normal map mode.": "Materiales de suelo para caminos de tierra, campos, campos de batalla, trincheras, obras y senderos forestales sobre terreno y geometría de niveles, con mapa de altura para el modo normal map.",
   "Top-down dirt and mud tiles for 2D and isometric games and backgrounds.": "Losetas de tierra y barro vistas desde arriba para juegos 2D e isométricos y fondos.",
@@ -1903,7 +1903,7 @@ UGTG.addLang('it', {
   "Hand-painted cobble path": "Sentiero di ciottoli dipinto a mano",
   "Lunar rubble": "Detriti lunari",
   "Alien crystals": "Cristalli alieni",
-  "Mud & Dirt": "Fango e terra",
+  "Mud": "Fango",
   "Tileable dirt, soil and mud with clods, pebbles, dried cracks, wet patches, puddles, tire tracks, twigs and height map": "Terra, suolo e fango ripetibili con zolle, ciottoli, crepe secche, chiazze bagnate, pozzanghere, tracce di pneumatici, rametti e height map",
   "Ground materials for dirt roads, fields, battlefields, trenches, construction sites and forest paths on terrain and level geometry, with a height map for the normal map mode.": "Materiali per il terreno di strade sterrate, campi, campi di battaglia, trincee, cantieri e sentieri nel bosco su terrain e geometria dei livelli, con height map per la modalità normal map.",
   "Top-down dirt and mud tiles for 2D and isometric games and backgrounds.": "Tile di terra e fango viste dall’alto per giochi 2D e isometrici e sfondi.",

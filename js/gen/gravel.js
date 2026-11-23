@@ -28,7 +28,7 @@
     name: 'Gravel',
     desc: 'Tileable gravel, pebbles and crushed stone, loose or tightly packed, with ground fill, shadows and height map',
     uses: ['Ground materials for paths, driveways, riverbeds, shingle beaches, railway beds and rubble on terrain and level geometry, with a height map for the normal map mode.', 'Top-down stone ground tiles for 2D and isometric games and backgrounds.'],
-    tags: ['Texturing', 'Nature'],
+    tags: ['PBR', 'Nature'],
     tileable: true,
     heightMap: true,
     icon: U.icon('<rect x="3" y="3" width="18" height="18" rx="1"/><ellipse cx="9" cy="9" rx="3" ry="2.2"/><ellipse cx="15.5" cy="14.5" rx="2.6" ry="2"/><circle cx="7.5" cy="16" r="1.2"/><circle cx="16" cy="7.5" r="1"/><circle cx="12" cy="18.5" r=".7"/>'),
@@ -62,6 +62,13 @@
       { key: 'fill2', label: 'Second color', type: 'color', default: LOOKS.river.fill2, tip: 'Mottling blends toward this color' },
       { key: 'fillMottle', label: 'Mottling', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5 },
       { key: 'fillGrain', label: 'Grit', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6, tip: 'Fine grit and sand grains between the stones' },
+      { type: 'section', label: 'Moss', active: (p) => p.moss > 0 },
+      { key: 'moss', label: 'Mossiness', type: 'range', min: 0, max: 1, step: 0.01, default: 0, tip: 'Moss cushions in patches: first in the gaps between the stones, then creeping up and over them' },
+      { key: 'mossStones', label: 'Moss on stones', type: 'range', min: 0, max: 1, step: 0.01, default: 0.4, show: (p) => p.moss > 0, tip: '0 = only in the gaps and around the stone bases, 1 = grows over the stone tops just as readily' },
+      { key: 'mossScale', label: 'Patches across', type: 'int', min: 1, max: 24, default: 4, show: (p) => p.moss > 0 },
+      { key: 'mossThick', label: 'Cushion height', type: 'range', min: 0, max: 1, step: 0.01, default: 0.4, show: (p) => p.moss > 0, tip: 'Raises the height map where moss grows, filling the gaps' },
+      { key: 'mossA', label: 'Moss color', type: 'color', default: '#4b6a22', show: (p) => p.moss > 0 },
+      { key: 'mossB', label: 'Moss tips', type: 'color', default: '#7f9a3a', show: (p) => p.moss > 0, tip: 'Fresh, lighter growth mixed in with fine grain' },
       ...U.groundLightParams({ shadow: 0.55, ao: 0.55, aoTip: 'Darkens the gaps around the stones' }),
     ],
     presets: [
@@ -78,6 +85,8 @@
       { name: 'Desert gravel (reg)', group: 'Realistic', values: { look: 'custom', fill: '#e2b57c', fill2: '#c9935a', st1: '#b4845c', st2: '#8a5d3e', st3: '#d6ab7c', stones: 0.25, stoneScale: 12, gravel: 0.75, gravelScale: 40, packing: 0.3, roundness: 0.35, bury: 0.5, stoneHeight: 0.45, colorVar: 0.7, dust: 0.3 } },
       { name: 'Lava scoria', group: 'Realistic', values: { look: 'custom', fill: '#2e2624', fill2: '#3c2c26', st1: '#5a3a30', st2: '#3a2622', st3: '#7a4a38', stones: 0.9, stoneScale: 11, gravel: 0.8, gravelScale: 34, packing: 0.75, roundness: 0.3, irregular: 0.8, sizeVar: 0.55, stoneHeight: 0.6, bury: 0, stoneDetail: 1, colorVar: 0.6, veins: 0 } },
       { name: 'Muddy gravel', group: 'Realistic', values: { look: 'custom', fill: '#5a4a38', fill2: '#463828', st1: '#8a7c6a', st2: '#625646', st3: '#a8987e', stones: 0.5, stoneScale: 11, gravel: 0.6, gravelScale: 34, packing: 0.45, roundness: 0.5, bury: 0.55, wet: 0.55, dust: 0.45 } },
+      { name: 'Mossy forest path', group: 'Realistic', values: { look: 'custom', fill: '#4a3c2c', fill2: '#3a2e22', st1: '#7c786e', st2: '#5a5750', st3: '#9a948a', stones: 0.75, stoneScale: 9, gravel: 0.6, packing: 0.6, bury: 0.3, dust: 0.1, moss: 0.55, mossStones: 0.35, mossScale: 4, mossThick: 0.5 } },
+      { name: 'Overgrown riverbed', group: 'Realistic', values: { stones: 0.85, stoneScale: 7, gravel: 0.5, packing: 0.8, wet: 0.5, dust: 0, moss: 0.6, mossStones: 0.5, mossScale: 3, mossThick: 0.6, mossA: '#3e5e1c', mossB: '#7ea032' } },
       { name: 'Aquarium gravel', group: 'Stylized', values: { look: 'custom', fill: '#2a2a2a', fill2: '#1a1a1a', st1: '#e04a3a', st2: '#3a8ae0', st3: '#f0d04a', stones: 0, gravel: 1, gravelScale: 22, packing: 0.95, roundness: 0.95, colorVar: 1, stoneDetail: 0.1, veins: 0, dust: 0, wet: 0.5 } },
       { name: 'Toon gravel', group: 'Stylized', values: { style: 'toon', look: 'custom', fill: '#8a7a68', fill2: '#7a6a58', st1: '#c4b8a8', st2: '#a09484', st3: '#ddd2c2', fillGrain: 0.1, stones: 0.7, stoneScale: 10, gravel: 0.8, gravelScale: 26, packing: 0.7, roundness: 0.75, irregular: 0.15, colorVar: 0.4, stoneDetail: 0, veins: 0, dust: 0, ao: 0.3 } },
       { name: 'Hand-painted cobble path', group: 'Stylized', values: { look: 'custom', fill: '#6a5a48', fill2: '#544636', st1: '#a89888', st2: '#887868', st3: '#c8b8a4', stones: 0.95, stoneScale: 6, gravel: 0.4, packing: 0.8, roundness: 0.8, irregular: 0.2, stoneDetail: 0.1, veins: 0, dust: 0.2, relief: 0.9, ao: 0.7 } },
@@ -89,21 +98,35 @@
       const per = (f) => [Math.max(1, Math.round((f * W) / S)), Math.max(1, Math.round((f * H) / S))];
       const [mpx, mpy] = per(4), [gpx, gpy] = per(150), [dpx, dpy] = per(40);
       const fill = U.hex(p.fill), fill2 = U.hex(p.fill2), pal = [U.hex(p.st1), U.hex(p.st2), U.hex(p.st3)];
+      // moss: patch mask, fine cushion grain, threshold that the mossiness slider lowers
+      const moss = p.moss > 0, mA = U.hex(p.mossA), mB = U.hex(p.mossB);
+      const [mspx, mspy] = per(Math.max(1, p.mossScale | 0)), [mfpx, mfpy] = per(220);
+      const mT = lerp(0.95, 0.05, p.moss || 0);
 
       // stone layers: f cells across the short side, radius in cell units
       const layers = [];
       const gap = lerp(0.06, 0.012, p.packing), rad = 0.24 + 0.52 * p.packing;
       if (p.stones > 0) layers.push({ f: p.stoneScale, cover: p.stones, s: seed + 101, k: 0 });
       if (p.gravel > 0) layers.push({ f: p.gravelScale, cover: p.gravel, s: seed + 202, k: 1 });
-      for (const L of layers) { [L.px, L.py] = per(L.f); L.r = rad; }
+      for (const L of layers) {
+        [L.px, L.py] = per(L.f); L.r = rad;
+        // jitter of every cell's feature point, hashed once per cell instead of 9× per pixel
+        L.jx = new Float64Array(L.px * L.py); L.jy = new Float64Array(L.px * L.py);
+        for (let wy = 0, n = 0; wy < L.py; wy++) for (let wx = 0; wx < L.px; wx++, n++) {
+          L.jx[n] = (U.hash(wx, wy, L.s) - 0.5) * JIT; L.jy[n] = (U.hash(wx, wy, L.s + 7919) - 0.5) * JIT;
+        }
+      }
 
       const stone = (L, u, v) => {
-        const x = u * L.px, y = v * L.py, xi = Math.floor(x), yi = Math.floor(y);
+        const x = u * L.px, y = v * L.py, xi = Math.floor(x), yi = Math.floor(y), lpx = L.px, lpy = L.py, JX = L.jx, JY = L.jy;
         let b = 0, bd = 1e9;
         for (let n = 0, j = -1; j <= 1; j++) {
+          const cy = yi + j;
+          let wy = cy % lpy; if (wy < 0) wy += lpy;
           for (let i = -1; i <= 1; i++, n++) {
-            const cx = xi + i, cy = yi + j, wx = U.mod(cx, L.px), wy = U.mod(cy, L.py);
-            const fx = cx + 0.5 + (U.hash(wx, wy, L.s) - 0.5) * JIT, fy = cy + 0.5 + (U.hash(wx, wy, L.s + 7919) - 0.5) * JIT;
+            const cx = xi + i;
+            let wx = cx % lpx; if (wx < 0) wx += lpx;
+            const c = wy * lpx + wx, fx = cx + 0.5 + JX[c], fy = cy + 0.5 + JY[c];
             PX[n] = fx; PY[n] = fy; WX[n] = wx; WY[n] = wy;
             const d = (fx - x) * (fx - x) + (fy - y) * (fy - y);
             if (d < bd) { bd = d; b = n; }
@@ -167,11 +190,13 @@
             r *= f; g *= f; b *= f; h += (0.5 - gc.f1) * p.fillGrain * 0.0016;
           }
           const gr = r, gg = g, gb = b;
+          let onStone = false, sEdge = 0;
           // stones: the highest surface wins
           for (const L of layers) {
             const st = stone(L, u, v);
             if (st.h <= h) continue;
             h = st.h;
+            onStone = true; sEdge = st.edge;
             const pi = Math.min(2, (st.r1 * 3) | 0), q = pal[pi], q2 = pal[(pi + 1) % 3], mix = st.r2 * p.colorVar * 0.6;
             const br = 1 + (U.hash(st.wx, st.wy, L.s + 18) - 0.5) * p.colorVar * 0.5;
             let sd = 1;
@@ -190,6 +215,20 @@
               r = lerp(r, gr * 1.08, ds); g = lerp(g, gg * 1.08, ds); b = lerp(b, gb * 1.08, ds);
             }
             flags[i] = toon && st.edge < 0.07 + L.k * 0.05 ? 3 : 1;
+          }
+          if (moss) {
+            // gaps and stone bases are favoured; stone tops need "Moss on stones"
+            const bias = onStone ? (1 - smoothstep(0, 0.45, sEdge)) * 0.18 - 0.3 * (1 - p.mossStones) : 0.14;
+            const fine = U.value(u * mfpx, v * mfpy, mfpx, mfpy, seed + 43) * 0.5 + 0.5, grain = U.hash(x, y, seed + 44);
+            const pm = U.fractal('perlin', u * mspx, v * mspy, mspx, mspy, 4, 0.55, 'fbm', seed + 41) + bias + (fine - 0.5) * 0.14 + (grain - 0.5) * 0.06;
+            const mm = smoothstep(mT - 0.05, mT + 0.07, pm);
+            if (mm > 0) {
+              const t = clamp(fine * 0.75 + grain * 0.35 - 0.1), k = 0.88 + 0.24 * grain;
+              r = lerp(r, lerp(mA[0], mB[0], t) * k, mm); g = lerp(g, lerp(mA[1], mB[1], t) * k, mm); b = lerp(b, lerp(mA[2], mB[2], t) * k, mm);
+              const f0m = p.stones > 0 ? p.stoneScale : p.gravelScale;
+              h += mm * p.mossThick * (0.12 / f0m) * (0.65 + 0.35 * fine + 0.15 * grain);
+              if (mm > 0.5) flags[i] &= 2; // moss is matte: no wet stone highlight
+            }
           }
           Hf[i] = h;
           d[o] = r; d[o + 1] = g; d[o + 2] = b; d[o + 3] = 255;

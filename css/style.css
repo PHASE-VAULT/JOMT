@@ -384,6 +384,23 @@ body.empty .welcome { display: block; overflow: auto; scrollbar-gutter: stable; 
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 .slider::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 0; }
+/* span (min … max): two range inputs on one track; the wrap draws the track with the filled part between
+   the handles (--a … --b), the inputs are transparent and only their thumbs catch the pointer */
+.ctl-span { display: block; }
+.span-nums { display: flex; align-items: center; gap: 4px; }
+.span-nums .num { width: 58px; }
+.span-dash { color: var(--text3, var(--text2)); }
+.span-wrap { position: relative; height: 18px; --a: 0%; --b: 100%; }
+.span-wrap::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 7px; height: 4px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--panel3) var(--a), var(--accent) var(--a), var(--accent) var(--b), var(--panel3) var(--b));
+}
+.span-sl { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.span-sl + .span-sl { z-index: 2; }
+.span-sl::-webkit-slider-runnable-track { background: transparent; }
+.span-sl::-moz-range-track, .span-sl::-moz-range-progress { background: transparent; }
+.span-sl::-webkit-slider-thumb { pointer-events: auto; cursor: pointer; }
+.span-sl::-moz-range-thumb { pointer-events: auto; cursor: pointer; }
 .slider:focus-visible { outline: none; }
 .slider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.45); }
 
@@ -741,12 +758,31 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 3px; }
   z-index: 3;
 }
 .gl-box[hidden] { display: none; }
+.gl-side { display: flex; flex-direction: column; gap: 6px; }
+.gl-btns { display: flex; gap: 4px; }
+.gl-tex-wrap { display: none; }
+/* main mode: the refraction preview fills the viewport area (grid row 2 of the stage); the texture and the
+   preview settings sit in a floating panel in the corner */
+.gl-box.main {
+  grid-row: 2; grid-column: 1; inset: 0; width: auto;
+  align-items: center; justify-content: center;
+  padding: 24px; border: 0; border-radius: 0; box-shadow: none;
+  background: radial-gradient(circle at 1px 1px, #202222 1px, transparent 0) 0 0 / 18px 18px, var(--bg);
+}
+.gl-box.main #glView { width: 512px; height: 512px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 10px 40px rgba(0, 0, 0, 0.45); border-radius: 0; }
+.gl-box.main .gl-side {
+  position: absolute; right: 16px; bottom: 16px; width: 248px; padding: 8px;
+  background: var(--panel); border: 1px solid var(--line2); border-radius: 9px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.gl-box.main .gl-tex-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; font: 11px var(--mono); color: var(--muted); }
+.gl-box.main #glTex { display: block; width: 230px; height: 230px; object-fit: contain; border-radius: 5px; background: var(--checker); }
 .gl-head { display: flex; align-items: center; justify-content: space-between; font: 11px var(--mono); color: var(--muted); }
 .gl-fold { background: none; border: 1px solid var(--line); border-radius: 5px; color: var(--muted); cursor: pointer; width: 22px; height: 22px; padding: 0; line-height: 1; }
 .gl-fold:hover { color: var(--text); border-color: var(--line2); }
 #glView { display: block; width: 230px; height: 230px; border-radius: 5px; background: #000; align-self: center; }
 .gl-ctl { display: flex; flex-direction: column; gap: 5px; }
 .gl-box.folded .gl-ctl { display: none; }
+.gl-box.main.folded .gl-tex-wrap { display: flex; }
 .gl-row { display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text2); }
 .gl-row select { padding: 2px 4px; font-size: 11.5px; }
 .gl-box:not(.is-water) .gl-anim { display: none; }
@@ -795,7 +831,7 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 3px; }
 .tag-chip {
   font: inherit;
   font-size: 12px;
-  padding: 4px 10px;
+  padding: 4px 8px;
   border-radius: 999px;
   border: 1px solid var(--line2);
   background: var(--panel);
@@ -807,7 +843,9 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 3px; }
 .tag-chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 650; }
 .tag-chip.on:hover { background: var(--accent-hi); border-color: var(--accent-hi); }
 .tag-count { color: var(--muted); font: 12px var(--mono); white-space: nowrap; }
-.tag-reset:disabled { opacity: 0.4; cursor: default; }
+.tag-reset { flex: none; width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 1px solid var(--line2); background: var(--panel); color: var(--text2); font: 16px/1 sans-serif; cursor: pointer; }
+.tag-reset:hover { border-color: var(--accent); color: var(--text); }
+.tag-reset[hidden] { display: none; }
 
 /* filter animation runs from JS (FLIP); leaving cards are pinned absolutely inside the grid */
 .gen-grid { position: relative; }
@@ -883,6 +921,17 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 3px; }
 /* ---------- inspector size: --insp scales the settings panel (width + contents) ---------- */
 .layout { grid-template-columns: minmax(0, 1fr) calc(340px * var(--insp, 1)); }
 .panel { zoom: var(--insp, 1); }
+/* generator search (right end of the filter bars) */
+.gen-search { position: relative; display: flex; align-items: center; flex: 0 1 200px; min-width: 150px; margin-left: auto; }
+.gen-search svg { position: absolute; left: 8px; width: 15px; height: 15px; color: var(--muted); pointer-events: none; }
+.gen-search input {
+  width: 100%; height: 28px; padding: 0 8px 0 28px; border-radius: 7px;
+  background: var(--bg2); border: 1px solid var(--line); color: var(--text); font: inherit; font-size: 12.5px;
+}
+.gen-search input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.18); }
+.gen-search input::-webkit-search-cancel-button { cursor: pointer; }
+.search-none { margin: 18px 0; text-align: center; color: var(--muted); }
+.search-none[hidden] { display: none; }
 .insp-scale { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; margin-right: 10px; color: var(--muted); }
 .insp-scale svg { width: 16px; height: 16px; flex: none; }
 .insp-scale select { height: 26px; padding: 0 6px; font-size: 12px; }

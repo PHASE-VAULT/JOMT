@@ -102,7 +102,8 @@
       { name: 'Natural rainbow', group: 'Realistic', values: { noise: 0.3, innerSky: 0.15 } },
       { name: 'Double rainbow', group: 'Realistic', values: { radius: 0.32, width: 0.09, secondary: 0.45, alex: 0.3, innerSky: 0.2, supernum: 0.35, noise: 0.25 } },
       { name: 'Faint misty rainbow', group: 'Realistic', values: { opacity: 0.45, saturation: 0.6, softness: 0.9, glow: 0.3, glowSize: 1, noise: 0.65, noiseScale: 3, groundFade: 0.5 } },
-      { name: 'Rainbow fragment', group: 'Realistic', values: { cx: 0, cy: 2, radius: 1, width: 0.07, dir: -52, span: 40, endFade: 0.7, noise: 0.45, noiseScale: 3, groundFade: 0.2 } },
+      // radius scales with the width, the center with the height: the fragment is only on screen at 2:1
+      { name: 'Rainbow fragment', group: 'Realistic', aspect: '2:1', values: { cx: 0, cy: 2, radius: 1, width: 0.07, dir: -52, span: 40, endFade: 0.7, noise: 0.45, noiseScale: 3, groundFade: 0.2 } },
       { name: 'Fogbow', group: 'Realistic', values: { radius: 0.4, width: 0.3, saturation: 0.14, brightness: 1.1, opacity: 0.6, softness: 1, glow: 0.35, glowSize: 1, noise: 0.35, noiseScale: 3 } },
       { name: 'Sun halo (22° ring)', group: 'Realistic', values: { shape: 'full', cy: 0.5, radius: 0.21, width: 0.3, palette: 'custom', stops: HALO, saturation: 0.9, opacity: 0.85, softness: 0.4, glow: 0, noise: 0.2, noiseScale: 3, groundFade: 0, edgeFade: 0.05 } },
       { name: 'Moonbow', group: 'Realistic', values: { saturation: 0.3, brightness: 0.9, opacity: 0.45, softness: 0.8, glow: 0.2, noise: 0.35 } },

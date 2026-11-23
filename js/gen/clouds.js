@@ -78,7 +78,8 @@
       { key: 'bands', label: 'Tone bands', type: 'int', min: 2, max: 5, default: 3, show: banded },
       { key: 'outline', label: 'Outline', type: 'range', min: 0, max: 10, step: 0.1, default: 0, show: banded, tip: 'px @ 512' },
       { key: 'outlineColor', label: 'Outline color', type: 'color', default: '#3a4a6a', show: (p) => banded(p) && p.outline > 0 },
-      { key: 'sun', label: 'Light angle', type: 'range', min: -180, max: 180, step: 1, default: -60, tip: '-90 = light from straight above, 180 = from the left' },
+      { key: 'lightMode', label: 'Light', type: 'select', default: 'angled', options: [['angled', 'Angled (light angle)'], ['ambient', 'Ambient (soft, no direction)']], tip: 'Ambient: soft light from all around, like an overcast sky: no direction; the puffs darken gently toward their edges and the thick inner parts of the cloud get a little darker' },
+      { key: 'sun', label: 'Light angle', type: 'range', min: -180, max: 180, step: 1, default: -60, show: (p) => p.lightMode !== 'ambient', tip: '-90 = light from straight above, 180 = from the left' },
       { key: 'shade', label: 'Self-shadowing', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6, tip: 'How dark the parts facing away from the light get' },
       { key: 'rim', label: 'Silver lining', type: 'range', min: 0, max: 1, step: 0.01, default: 0.45, tip: 'Bright thin edges toward the light (toon / flat: a cel highlight)' },
 
@@ -187,11 +188,27 @@
       };
       const lz = 0.75, ln = Math.hypot(lx, ly, lz), Lx = lx / ln, Ly = ly / ln, Lz = lz / ln, du2 = (2 * st) / S;
       const stepU = cs * 0.06 * (S / st), K = 7;
+      // ambient light (overcast, from all around): no sun offset; the dome shading only depends on how much the
+      // surface faces the viewer, and the self-shadowing on how deep in the cloud a point sits (thick = darker)
+      const ambient = p.lightMode === 'ambient';
+      const AD = [0, 1, 2, 3, 4, 5, 6, 7].map((q) => { const a = (q * Math.PI) / 4, rr = stepU * (q % 2 ? 4 : 2); return [Math.cos(a) * rr, Math.sin(a) * rr]; });
       for (let j = 0, o = 0; j < gh; j++) for (let i = 0; i < gw; i++, o++) {
         if (F[o] < -2) { Lg[o] = 1; continue; }
         const il = i > 0 ? o - 1 : o, ir = i < gw - 1 ? o + 1 : o, ju = j > 0 ? o - gw : o, jd = j < gh - 1 ? o + gw : o;
         const nx = -(Z[ir] - Z[il]) / du2, ny = -(Z[jd] - Z[ju]) / du2, nl = Math.hypot(nx, ny, 1);
-        let lit = 0.2 + 0.8 * Math.max(0, (nx * Lx + ny * Ly + Lz) / nl);
+        let lit;
+        if (ambient) {
+          const nz = 1 / nl;
+          lit = 0.85 * Math.max(0.35, 1 - (1 - nz * nz) * 0.8);
+          if (side) { // cloud all around this point (no direction): the thicker, the darker
+            let occ = clamp(F[o] / depth);
+            for (let q = 0; q < 8; q++) occ += clamp(at(i + AD[q][0], j + AD[q][1]) / depth);
+            lit *= Math.exp(-(occ / 9) * 0.5);
+          } else lit *= 0.75 + 0.25 * clamp(F[o] / depth);
+          Lg[o] = clamp(1 - p.shade * (1 - lit) * 1.15);
+          continue;
+        }
+        lit = 0.2 + 0.8 * Math.max(0, (nx * Lx + ny * Ly + Lz) / nl);
         if (side) {
           // self-shadowing: how much cloud lies between this point and the light
           let occ = 0;

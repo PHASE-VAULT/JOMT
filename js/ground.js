@@ -1,10 +1,10 @@
-/* Shared lighting for the tileable ground generators (Sand, Gravel, Mud & Dirt).
+/* Shared lighting for the tileable ground generators (Sand, Gravel, Mud).
    A generator writes its albedo into an ImageData and its height into a Float32Array in short-side units
    (one pixel = 1 / S), then calls U.groundFinish(): height map output, flat albedo, or lit color from the
    height gradient (lambert), cast shadows marched toward the light, cavity occlusion from a blurred height
    on a coarse grid (so every size looks the same), wetness (darker, saturated, glossy) and an optional toon
    look. Everything wraps around the edges, so tileable inputs stay tileable.
-   - U.groundLightParams(defaults): the Lighting section for a generator's params
+   - U.groundLightParams(defaults): the Lighting section for a generator's params (angled or ambient light)
    - U.groundFinish(ctx, img, Hf, W, H, p, o): o = { flags, wetMap, aoScale, heightRef, shadowLen, height }
        flags (Uint8Array, optional): 1 = gets the full wet highlight (stones, water), 2 = toon outline
        wetMap (Float32Array, optional): per-pixel wetness 0..1, multiplied with p.wet when p.wet > 0, else used as is */
@@ -17,10 +17,11 @@
   U.groundLightParams = (d = {}) => [
     { type: 'section', label: 'Lighting' },
     { key: 'style', label: 'Style', type: 'select', default: d.style || 'realistic', options: [['realistic', 'Realistic'], ['toon', 'Toon (bands + outline)']] },
-    { key: 'lightAngle', label: 'Light angle', type: 'range', min: -180, max: 180, step: 1, default: -135, tip: 'Direction the light comes from (-135 = top left)' },
-    { key: 'lightHeight', label: 'Light height', type: 'range', min: 10, max: 80, step: 1, default: d.lightHeight || 40, tip: 'Elevation of the light in degrees: low light gives long shadows' },
+    { key: 'lightMode', label: 'Light', type: 'select', default: 'angled', options: [['angled', 'Angled (light angle)'], ['ambient', 'Ambient (soft, no direction)']], tip: 'Ambient: soft light from all around, like an overcast sky: no direction and no cast shadows; slopes darken gently and dips keep their occlusion. Best when the engine supplies the real light' },
+    { key: 'lightAngle', label: 'Light angle', type: 'range', min: -180, max: 180, step: 1, default: -135, show: (p) => p.lightMode !== 'ambient', tip: 'Direction the light comes from (-135 = top left)' },
+    { key: 'lightHeight', label: 'Light height', type: 'range', min: 10, max: 80, step: 1, default: d.lightHeight || 40, show: (p) => p.lightMode !== 'ambient', tip: 'Elevation of the light in degrees: low light gives long shadows' },
     { key: 'relief', label: 'Relief shading', type: 'range', min: 0, max: 1, step: 0.01, default: d.relief == null ? 0.75 : d.relief },
-    { key: 'shadow', label: 'Cast shadows', type: 'range', min: 0, max: 1, step: 0.01, default: d.shadow == null ? 0.5 : d.shadow },
+    { key: 'shadow', label: 'Cast shadows', type: 'range', min: 0, max: 1, step: 0.01, default: d.shadow == null ? 0.5 : d.shadow, show: (p) => p.lightMode !== 'ambient' },
     { key: 'ao', label: 'Ambient occlusion', type: 'range', min: 0, max: 1, step: 0.01, default: d.ao == null ? 0.5 : d.ao, tip: d.aoTip || 'Darkens dips and gaps' },
     { key: 'wet', label: 'Wetness', type: 'range', min: 0, max: 1, step: 0.01, default: d.wet || 0, tip: 'Darker, more saturated colors and a glossy highlight' },
     { key: 'output', label: 'Output', type: 'select', default: 'lit', options: [['lit', 'Lit color'], ['albedo', 'Flat albedo (no baked light)'], ['height', 'Height map']] },
@@ -44,7 +45,7 @@
       return;
     }
     function wetAt(i) { return wetMap ? (p.wet > 0 ? clamp(wetMap[i] + p.wet * (1 - wetMap[i])) : wetMap[i]) : p.wet; }
-    const toon = p.style === 'toon';
+    const toon = p.style === 'toon', ambient = p.lightMode === 'ambient';
     const la = p.lightAngle * RAD, le = p.lightHeight * RAD;
     const Lx = Math.cos(la) * Math.cos(le), Ly = Math.sin(la) * Math.cos(le), Lz = Math.sin(le), tanE = Math.tan(le);
     let Hx = Lx, Hy = Ly, Hz = Lz + 1;
@@ -71,28 +72,34 @@
       };
       for (let it = 0; it < 2; it++) { pass(blur, tmp, bw, bh, true); pass(tmp, blur, bw, bh, false); }
     }
+    // wrap of an integer index into 0..n-1 (same as U.mod for integers, without the second %)
+    const wr = (i, n) => { i %= n; return i < 0 ? i + n : i; };
     const blurAt = (x, y) => {
       const fx = (x + 0.5) / bs - 0.5, fy = (y + 0.5) / bs - 0.5, x0 = Math.floor(fx), y0 = Math.floor(fy), tx = fx - x0, ty = fy - y0;
-      const a = U.mod(x0, bw), a1 = U.mod(x0 + 1, bw), c = U.mod(y0, bh) * bw, c1 = U.mod(y0 + 1, bh) * bw;
+      const a = wr(x0, bw), a1 = wr(x0 + 1, bw), c = wr(y0, bh) * bw, c1 = wr(y0 + 1, bh) * bw;
       return lerp(lerp(blur[c + a], blur[c + a1], tx), lerp(blur[c1 + a], blur[c1 + a1], tx), ty);
     };
     const aoK = (p.ao * 0.75) / heightRef;
     const steps = 12, maxD = o.shadowLen || 0.05, sdx = Math.cos(la), sdy = Math.sin(la); // toward the light
+    // shadow march offsets per step (the same expressions as per pixel, computed once)
+    const stX = new Float64Array(steps + 1), stY = new Float64Array(steps + 1), stZ = new Float64Array(steps + 1);
+    for (let k = 1; k <= steps; k++) { const dd = (k / steps) * maxD; stX[k] = sdx * dd * S; stY[k] = sdy * dd * S; stZ[k] = dd * tanE; }
 
     for (let y = 0, i = 0; y < H; y++) {
-      const ym = U.mod(y - 1, H) * W, yp = U.mod(y + 1, H) * W, yr = y * W;
+      const ym = wr(y - 1, H) * W, yp = wr(y + 1, H) * W, yr = y * W;
       for (let x = 0; x < W; x++, i++) {
         const q = i * 4, h0 = Hf[i];
-        const gx = (Hf[yr + U.mod(x + 1, W)] - Hf[yr + U.mod(x - 1, W)]) * S * 0.5;
+        const gx = (Hf[yr + (x + 1 === W ? 0 : x + 1)] - Hf[yr + (x === 0 ? W - 1 : x - 1)]) * S * 0.5;
         const gy = (Hf[yp + x] - Hf[ym + x]) * S * 0.5;
         const nl = Math.hypot(gx, gy, 1), nx = -gx / nl, ny = -gy / nl, nz = 1 / nl;
-        let shade = lerp(1, Math.max(0, nx * Lx + ny * Ly + nz * Lz) / Lz, p.relief); // flat ground = 1
+        // ambient (sky from all around): slopes see less sky and darken gently, whichever way they face
+        let shade = ambient ? Math.max(0.5, 1 - (1 - nz * nz) * p.relief * 1.4) : lerp(1, Math.max(0, nx * Lx + ny * Ly + nz * Lz) / Lz, p.relief); // flat ground = 1
         if (toon) shade = shade < 0.8 ? 0.72 : shade < 1.12 ? 1 : 1.18;
-        if (p.shadow > 0) {
+        if (p.shadow > 0 && !ambient) {
           let sh = 0;
           for (let k = 1; k <= steps; k++) {
-            const dd = (k / steps) * maxD, sx = U.mod(Math.round(x + sdx * dd * S), W), sy = U.mod(Math.round(y + sdy * dd * S), H);
-            const over = Hf[sy * W + sx] - h0 - dd * tanE;
+            const sx = wr(Math.round(x + stX[k]), W), sy = wr(Math.round(y + stY[k]), H);
+            const over = Hf[sy * W + sx] - h0 - stZ[k];
             if (over > 0) { sh = Math.max(sh, Math.min(1, over * S * 0.6)); if (sh >= 1) break; }
           }
           if (toon) sh = sh > 0.35 ? 1 : 0;
@@ -106,8 +113,8 @@
         if (w > 0) { const l = (r + g + b) / 3, sat = 1 + w * 0.25; r = l + (r - l) * sat; g = l + (g - l) * sat; b = l + (b - l) * sat; }
         r *= shade; g *= shade; b *= shade;
         if (w > 0) {
-          const nh = Math.max(0, nx * Hx + ny * Hy + nz * Hz);
-          let sp = Math.pow(nh, 60) * w * (fl & 1 ? 1.1 : 0.35);
+          // ambient: a soft sky sheen on the flat wet parts instead of a hot spot
+          let sp = ambient ? Math.pow(nz, 8) * w * (fl & 1 ? 0.22 : 0.08) : Math.pow(Math.max(0, nx * Hx + ny * Hy + nz * Hz), 60) * w * (fl & 1 ? 1.1 : 0.35);
           if (toon) sp = sp > 0.3 ? 0.6 : 0;
           r += sp * 255; g += sp * 255; b += sp * 255;
         }

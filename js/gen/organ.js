@@ -18,19 +18,21 @@
               cut: true removes it, mx: true mirrors it (x -> 100 - x), part = body part, clip = [x, y, w, h]
      details: d = line, tube = both edges of a tube (w = tube width), c = circle [cx, cy, r] (fill = dot),
               a = opacity, mx = mirrored copy */
-  const TORSO = 'M38 22.5 C44 21.5 56 21.5 62 22.5 C66.5 23.3 68 26 67.5 30 C67 36 65 42 63.5 48 C62.8 52 62.6 56 63 60 L37 60 C37.4 56 37.2 52 36.5 48 C35 42 33 36 32.5 30 C32 26 33.5 23.3 38 22.5 Z';
-  const PELVIS = 'M37 56 L63 56 C64.5 60 65 64 63 67 C59 69.5 54 69 50 67.5 C46 69 41 69.5 37 67 C35 64 35.5 60 37 56 Z';
+  // full body: the classic status-screen figure (round head on a neck, rounded shoulders, torso narrowing to
+  // the waist, a briefs-shaped hip segment, arms hanging close to the body, long straight legs with a gap)
+  const TORSO = 'M41.5 19.6 C45.5 18.9 54.5 18.9 58.5 19.6 C63 20.4 65.2 22.6 65.2 26.2 C65.2 31 63.4 36.6 61 41.4 C59.9 43.8 59.4 46.4 59.5 50.5 L40.5 50.5 C40.6 46.4 40.1 43.8 39 41.4 C36.6 36.6 34.8 31 34.8 26.2 C34.8 22.6 37 20.4 41.5 19.6 Z';
+  const PELVIS = 'M40.3 49.5 L59.7 49.5 C61.8 52.4 62.8 56.4 62.3 61 C58.6 62.6 54 62.6 51 61.2 L50 57.8 L49 61.2 C46 62.6 41.4 62.6 37.7 61 C37.2 56.4 38.2 52.4 40.3 49.5 Z';
   const BEAN = 'M30 18 C17 18 11 33 11 50 C11 67 17 82 30 82 C40 82 45 74 43 65 C41 59 36.5 56 36.5 50 C36.5 44 41 41 43 35 C45 27 40 18 30 18 Z';
   const COIL = 'M34 36 C46 30 58 30 66 36 C70 42 62 48 50 46 C38 44 31 50 35 57 C41 63 57 61 64 65 C69 71 59 77 48 75 C40 73 35 77 40 83';
   const arm = (part, mx) => [
-    { s: 'M35.5 26 C31 34 29 41 28 48', w: 7, part, mx },
-    { s: 'M28 48 C27 55 25.5 61 24.5 67', w: 5.8, part, mx },
-    { e: [24, 71.5, 3.4, 4.8, 8], part, mx },
+    { s: 'M35.8 23.2 C33.6 29 32.4 34.4 31.9 40.4', w: 6.4, part, mx }, // upper arm
+    { s: 'M31.9 40.4 C31.3 46 30.8 51 30.4 55.4', w: 5.2, part, mx }, // forearm
+    { e: [30.2, 59.4, 3, 4.2, 4], part, mx }, // hand, at mid-thigh height
   ];
   const leg = (part, mx) => [
-    { s: 'M44 63 C43.5 71 43 77 42.6 83', w: 10, part, mx },
-    { s: 'M42.6 83 C42.3 88 42 92 41.8 95', w: 7, part, mx },
-    { e: [40.5, 97.3, 4.6, 2.3, 0], part, mx },
+    { s: 'M44.4 58 C44.1 65 43.9 71.5 43.8 78.2', w: 9.2, part, mx }, // thigh
+    { s: 'M43.8 78.2 C43.6 84 43.4 89 43.2 93.6', w: 6.4, part, mx }, // shin
+    { e: [41.9, 96.3, 3.9, 2.2, -6], part, mx }, // foot, turned slightly outward
   ];
 
   const ORGANS = {
@@ -107,15 +109,21 @@
       name: 'Full body',
       parts: [['head', 'Head'], ['chest', 'Chest'], ['stomach', 'Stomach'], ['armL', 'Arm (left side)'], ['armR', 'Arm (right side)'], ['legL', 'Leg (left side)'], ['legR', 'Leg (right side)']],
       prims: [
-        { e: [50, 10.5, 7, 8.5, 0], part: 'head' },
-        { s: 'M50 16 L50 23', w: 6.5, part: 'head' },
-        { f: TORSO, part: 'chest', clip: [0, 0, 100, 41] },
-        { f: TORSO, part: 'stomach', clip: [0, 41, 100, 59] },
+        { e: [50, 8.6, 6.2, 7.3, 0], part: 'head' },
+        { s: 'M50 14 L50 20.5', w: 4.6, part: 'head' },
+        { f: TORSO, part: 'chest', clip: [0, 0, 100, 36] },
+        { f: TORSO, part: 'stomach', clip: [0, 36, 100, 64] },
         { f: PELVIS, part: 'stomach' },
         ...arm('armL', false), ...arm('armR', true),
         ...leg('legL', false), ...leg('legR', true),
       ],
-      details: [{ d: 'M45 30 C47 32 53 32 55 30', a: 0.5 }, { d: 'M50 44 L50 54', a: 0.4 }],
+      details: [
+        { d: 'M43 23.5 C46 25 54 25 57 23.5', a: 0.45 }, // collarbones
+        { d: 'M50 38.5 L50 46', a: 0.35 },
+        { d: 'M40.4 50.5 C46 51.6 54 51.6 59.6 50.5', a: 0.75 }, // waistband
+        { d: 'M40.6 78.2 L46.6 78.2', a: 0.35, mx: true }, // knees
+        { d: 'M33.4 40.4 L30.4 40.4', a: 0.35, mx: true }, // elbows
+      ],
     },
     liver: {
       name: 'Liver',
@@ -371,6 +379,7 @@
       { name: 'Bone · fracture', group: 'Status', values: { organ: 'bone', fillStyle: 'gradient', fillColor: '#e6dcc4', fillColor2: '#8a7a5a', value: 1, wave: 0, surface: 0, grungeType: 'cracks', grunge: 0.35 } },
       { name: 'Skull · infection', group: 'Status', values: { organ: 'skull', fillStyle: 'gradient', fillColor: '#ddd2b8', fillColor2: '#6a5a40', value: 0.5, fillDir: 'down', wave: 0.2 } },
       { name: 'Body · limb damage', group: 'Body', values: { organ: 'body', fillStyle: 'gradient', fillColor: '#8a9a7a', fillColor2: '#3a4a32', value: 1, wave: 0, surface: 0, detail: 0.5, borderW: 4, highlight: 'armL', highlightColor: '#d8342b', margin: 0.04 } },
+      { name: 'Body · green status outline', group: 'Body', values: { organ: 'body', fillStyle: 'solid', fillColor: '#123a10', value: 1, wave: 0, surface: 0, borderW: 2.5, borderColor: '#8dff6e', detail: 0.9, detailW: 1.4, detailColor: '#6ee858', detailCut: false, rough: 0.04, pad: 1.5, shade: 0.35, rim: 0, segments: true, segW: 1.2, backColor: '#0a1a08', backAlpha: 0.9, shadowAlpha: 0, glow: 0.55, glowColor: '#4cff3a', glowSize: 7, grunge: 0, dirt: 0, edgeWear: 0, margin: 0.05 } },
       { name: 'Body · status silhouette', group: 'Body', values: { organ: 'body', fillStyle: 'solid', fillColor: '#5fe3b0', value: 1, wave: 0, surface: 0, detail: 0, borderW: 3.5, segW: 2, grunge: 0.15, dirt: 0.15, edgeWear: 0.2, shade: 0.3, margin: 0.04, splitParts: true } },
       { name: 'Head · concussion', group: 'Body', values: { organ: 'head', fillStyle: 'gradient', fillColor: '#d8a07a', fillColor2: '#6a3a24', value: 0.7, highlight: 'none' } },
       { name: 'Bloody grunge heart', group: 'Style', values: { fillColor: '#c41e18', fillColor2: '#3a0806', veins: 0.8, grunge: 0.45, dirt: 0.5, dirtColor: '#2a0604', scratches: 0.35, rough: 0.6, value: 0.85 } },

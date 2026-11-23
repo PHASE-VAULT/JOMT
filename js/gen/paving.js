@@ -110,7 +110,7 @@
     name: 'Street Paving',
     desc: 'Tileable cobblestones, setts, fan cobbles, herringbone, slabs and hex pavers with joints, moss and wetness',
     uses: ['Street and sidewalk materials for city, village and medieval levels, with a height map for the normal map mode.', 'Top-down road and plaza tiles for 2D and strategy games.'],
-    tags: ['Texturing'],
+    tags: ['PBR'],
     tileable: true,
     heightMap: true,
     icon: U.icon('<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h7M10 3v6M14 9h7M14 3v6M3 15h4M7 9v6M11 15h10M15 9v6M11 15v6"/>'),

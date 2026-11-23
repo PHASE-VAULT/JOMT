@@ -1,4 +1,4 @@
-/* Mud & dirt: tileable soil ground. Mottled, bumpy soil with grit; clods (domed Worley lumps) and pebbles;
+/* Mud: tileable soil ground. Mottled, bumpy soil with grit; clods (domed Worley lumps) and pebbles;
    dried-mud cracks (warped cell edges, the plates curl up at their edges); smooth, wet mud patches; water
    puddles in carved hollows (flat, tinted, reflecting the sky, with a wet shore); tire tracks running
    vertically (ruts with pushed-up berms and a chevron tread, wobbling with whole cycles so they tile;
@@ -14,7 +14,9 @@
     const xi = Math.floor(x), yi = Math.floor(y);
     let bd = 1e9;
     for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
-      const cx = xi + i, cy = yi + j, wx = U.mod(cx, px), wy = U.mod(cy, py);
+      const cx = xi + i, cy = yi + j; // periods are whole numbers: one % per axis wraps exactly
+      let wx = cx % px; if (wx < 0) wx += px;
+      let wy = cy % py; if (wy < 0) wy += py;
       const dx = x - (cx + 0.2 + 0.6 * U.hash(wx, wy, s)), dy = y - (cy + 0.2 + 0.6 * U.hash(wx, wy, s + 7919)), dd = dx * dx + dy * dy;
       if (dd < bd) { bd = dd; CP.dx = dx; CP.dy = dy; CP.k = wx * 7919 + wy; }
     }
@@ -32,10 +34,10 @@
 
   U.register({
     id: 'mud',
-    name: 'Mud & Dirt',
+    name: 'Mud',
     desc: 'Tileable dirt, soil and mud with clods, pebbles, dried cracks, wet patches, puddles, tire tracks, twigs and height map',
     uses: ['Ground materials for dirt roads, fields, battlefields, trenches, construction sites and forest paths on terrain and level geometry, with a height map for the normal map mode.', 'Top-down dirt and mud tiles for 2D and isometric games and backgrounds.'],
-    tags: ['Texturing', 'Nature', 'Military'],
+    tags: ['PBR', 'Nature', 'Military'],
     tileable: true,
     heightMap: true,
     icon: U.icon('<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M8 3v18M15 3v18" opacity=".45"/><path d="M5 9l2 1.5L9.5 8M14 15l2.5 1.5 2-2.5"/><ellipse cx="11.5" cy="13" rx="2" ry="1.2"/>'),

@@ -10,7 +10,9 @@
   const FORMATS = { png: ['image/png', 'png', 'PNG'], jpeg: ['image/jpeg', 'jpg', 'JPG'], webp: ['image/webp', 'webp', 'WebP'] };
   const STORE = 'ugtg.session.v1';
 
-  const S = { tabs: [], active: null, previewRes: 512, exportSize: 1024, format: 'png', hardPixels: true, tags: [] };
+  // saturation / colors: global output post-processing (js/post.js) for the preview and every export
+  const COLORS_MAX = U.COLORS_MAX;
+  const S = { tabs: [], active: null, previewRes: 512, exportSize: 1024, format: 'png', hardPixels: true, tags: [], saturation: 1, colors: COLORS_MAX };
   const PIXEL_MAX = 128; // export sizes up to this offer "hard pixels" (pixel-art output)
   const HARD_FACTOR = 8; // supersampling used to pick crisp pixel colors
   let nextId = 1, refreshVis = null, lastBuf = null, lastInfo = {}, lastScale = 1, lastMs = 0, lastPreviewMs = 0;
@@ -20,14 +22,20 @@
   const tabName = (t) => t.name || U.t(U.getGen(t.type).name) + (t.num > 1 ? ' ' + t.num : '');
 
   /* normal map mode: texturing generators can show / export a normal map derived from their output */
-  // every Texturing generator unless it opts out with `normalMap: false`; others can opt in with `normalMap: true`
-  const hasNormal = (gen) => !!gen && (gen.normalMap === true || (gen.normalMap !== false && (gen.tags || []).includes('Texturing')));
+  // every PBR / Texturing generator unless it opts out with `normalMap: false`; others can opt in with `normalMap: true`
+  const hasNormal = (gen) => !!gen && (gen.normalMap === true || (gen.normalMap !== false && (gen.tags || []).some((t) => t === 'PBR' || t === 'Texturing')));
   const normalOn = (tab) => !!(tab && tab.normal && tab.normal.on && hasNormal(U.getGen(tab.type)));
   const newNormal = (gen, src) => ({ on: src ? !!src.on : false, params: Object.assign(U.normalDefaults(gen), src && src.params) });
-  /* smoothness / roughness map mode (js/smooth.js): Texturing and Decals generators */
+  /* smoothness / roughness map mode (js/smooth.js): PBR, Texturing and Decals generators */
   const smoothOn = (tab) => !!(tab && tab.smooth && tab.smooth.on && U.hasSmooth(U.getGen(tab.type)));
   const newSmooth = (gen, src) => ({ on: src ? !!src.on : false, params: Object.assign(U.smoothDefaults(gen), src && src.params) });
-  const derivedOn = (tab) => normalOn(tab) || smoothOn(tab); // a map derived from the texture is shown
+  /* metallic map mode (js/metal.js): PBR generators and the ones with a metal suggestion */
+  const metalOn = (tab) => !!(tab && tab.metal && tab.metal.on && U.hasMetal(U.getGen(tab.type)));
+  const newMetal = (gen, src) => ({ on: src ? !!src.on : false, params: Object.assign(U.metalDefaults(gen), src && src.params) });
+  const derivedOn = (tab) => normalOn(tab) || smoothOn(tab) || metalOn(tab); // a map derived from the texture is shown
+  // saturation only applies to color output (derived maps are grayscale or vectors); the color count to everything
+  const satActive = (tab) => S.saturation !== 1 && !derivedOn(tab);
+  const postOpts = (tab) => ({ saturation: satActive(tab) ? S.saturation : 1, colors: S.colors });
   /* tilesheet mode: generators with an animate() hook render an N×N animation sheet */
   const hasSheet = (gen) => !!gen && typeof gen.animate === 'function';
   const sheetOn = (tab) => !!(tab && tab.sheet && tab.sheet.on && hasSheet(U.getGen(tab.type)));
@@ -69,6 +77,7 @@
       preset: src ? src.preset : gen.presets ? 'Default' : null,
       normal: newNormal(gen, src && src.normal),
       smooth: newSmooth(gen, src && U.clone(src.smooth)),
+      metal: newMetal(gen, src && U.clone(src.metal)),
       sheet: newSheet(src && U.clone(src.sheet)),
     };
     S.tabs.splice(src ? S.tabs.indexOf(src) + 1 : S.tabs.length, 0, tab);
@@ -88,7 +97,7 @@
      Changes that follow each other within BURST_MS (e.g. one slider drag) become a single step. */
   const HISTORY_MAX = 100, BURST_MS = 600;
   const history = new Map(); // tab id -> { undo: [], redo: [], last: string, burst: timer }
-  const snap = (tab) => JSON.stringify({ params: tab.params, aspect: tab.aspect, normal: tab.normal && tab.normal.params, smooth: tab.smooth && tab.smooth.params, sheet: tab.sheet && { ...tab.sheet, on: undefined } });
+  const snap = (tab) => JSON.stringify({ params: tab.params, aspect: tab.aspect, normal: tab.normal && tab.normal.params, smooth: tab.smooth && tab.smooth.params, metal: tab.metal && tab.metal.params, sheet: tab.sheet && { ...tab.sheet, on: undefined } });
   const hist = (tab) => {
     let h = history.get(tab.id);
     if (!h) { h = { undo: [], redo: [], last: snap(tab), burst: 0 }; history.set(tab.id, h); }
@@ -123,6 +132,7 @@
     tab.aspect = st.aspect;
     if (st.normal && tab.normal) tab.normal.params = st.normal;
     if (st.smooth && tab.smooth) tab.smooth.params = st.smooth;
+    if (st.metal && tab.metal) tab.metal.params = st.metal;
     if (st.sheet && tab.sheet) tab.sheet = Object.assign(st.sheet, { on: tab.sheet.on }); // undo never flips the mode
     h.last = snap(tab);
     tab.dirty = true;
@@ -231,16 +241,18 @@
   /* ---------- panel ---------- */
   let panelKey = '';
   function buildPanel() {
-    const tab = cur(), gen = U.getGen(tab.type), nm = normalOn(tab), sm = sheetOn(tab), sg = smoothOn(tab);
+    const tab = cur(), gen = U.getGen(tab.type), nm = normalOn(tab), sm = sheetOn(tab), sg = smoothOn(tab), mt = metalOn(tab);
     if (!tab.normal) tab.normal = newNormal(gen);
     if (!tab.smooth) tab.smooth = newSmooth(gen);
+    if (!tab.metal) tab.metal = newMetal(gen);
     if (!tab.sheet) tab.sheet = newSheet();
-    $('#genName').textContent = U.t(gen.name) + (nm ? ' · ' + U.t('Normal map') : sg ? ' · ' + U.t(tab.smooth.params.roughness ? 'Roughness' : 'Smoothness') : sm ? ' · ' + U.t('Tilesheet') : '');
+    $('#genName').textContent = U.t(gen.name) + (nm ? ' · ' + U.t('Normal map') : sg ? ' · ' + U.t(tab.smooth.params.roughness ? 'Roughness' : 'Smoothness') : mt ? ' · ' + U.t('Metallic') : sm ? ' · ' + U.t('Tilesheet') : '');
     // the header explains the generator through its use cases (primary + secondary); the short card
     // description is only a fallback. Normal map / tilesheet mode add a line about the mode.
     const uses = (gen.uses || []).filter(Boolean), ul = $('#genUses');
     const modeDesc = nm ? U.t(gen.normalDesc || 'Normal map derived from the texture: its brightness (or a channel) is used as height')
       : sg ? U.t('Suggested for this generator: {0}', U.t(U.smoothNote(gen)))
+      : mt ? U.t('Suggested for this generator: {0}', U.t(U.metalNote(gen)))
       : sm ? sheetDesc(tab) : uses.length ? '' : U.t(gen.desc);
     $('#genDesc').textContent = modeDesc;
     $('#genDesc').hidden = !modeDesc;
@@ -261,10 +273,13 @@
     tab.view.sections = tab.view.sections || {};
     if (nm) {
       // normal mode swaps the texture's settings for the normal map's own
-      refreshVis = U.ui.build(root, U.NORMAL_PARAMS, tab.normal.params, { change: onNormalChange, collapsed: (tab.view.normalSections = tab.view.normalSections || {}), persist: save });
+      refreshVis = inspect(root, U.NORMAL_PARAMS, tab.normal.params, onNormalChange, (tab.view.normalSections = tab.view.normalSections || {}), true);
     } else if (sg) {
       // smoothness mode: the texture's settings are replaced by the smoothness map's own
-      refreshVis = U.ui.build(root, U.smoothParams(gen), tab.smooth.params, { change: onSmoothChange, collapsed: (tab.view.smoothSections = tab.view.smoothSections || {}), persist: save });
+      refreshVis = inspect(root, U.smoothParams(gen), tab.smooth.params, onSmoothChange, (tab.view.smoothSections = tab.view.smoothSections || {}), true);
+    } else if (mt) {
+      // metallic mode: the metallic map's own settings
+      refreshVis = inspect(root, U.metalParams(gen), tab.metal.params, onNormalChange, (tab.view.metalSections = tab.view.metalSections || {}), true);
     } else if (sm) {
       // tilesheet mode adds a Tilesheet tab in front of the generator's own settings; the sh_* keys
       // are routed to tab.sheet so presets / reset of the generator leave them alone
@@ -274,23 +289,58 @@
         get: (t, k) => (k === 'sh__loop' ? !!gen.animLoop : typeof k === 'string' && k.startsWith('sh_') ? tab.sheet[k.slice(3)] : t[k]),
         set: (t, k, v) => { lastKey = String(k); if (lastKey.startsWith('sh_')) tab.sheet[lastKey.slice(3)] = v; else t[k] = v; return true; },
       });
-      refreshVis = U.ui.build(root, U.SHEET_PARAMS.concat(gen.params), vals, {
-        // the key is consumed per change: list item edits write to the item objects (not through the proxy),
-        // so they must not inherit the key of an earlier top-level edit
-        change: (rebuild) => { const k = lastKey; lastKey = ''; return k.startsWith('sh_') ? onSheetChange(rebuild, k) : onParamChange(rebuild); },
-        collapsed: tab.view.sections,
-        persist: save,
-      });
+      // the key is consumed per change: list item edits write to the item objects (not through the proxy),
+      // so they must not inherit the key of an earlier top-level edit
+      refreshVis = inspect(root, U.SHEET_PARAMS.concat(gen.params), vals, (rebuild) => { const k = lastKey; lastKey = ''; return k.startsWith('sh_') ? onSheetChange(rebuild, k) : onParamChange(rebuild); }, tab.view.sections, false);
     } else {
-      refreshVis = U.ui.build(root, gen.params, tab.params, { change: onParamChange, collapsed: tab.view.sections, persist: save });
+      refreshVis = inspect(root, gen.params, tab.params, onParamChange, tab.view.sections, false);
     }
-    const mk = tab.id + ':' + nm + ':' + sm + ':' + sg; // switching tab or mode starts the panel at the top
+    const mk = tab.id + ':' + nm + ':' + sm + ':' + sg + ':' + mt; // switching tab or mode starts the panel at the top
     root.scrollTop = panelKey === mk ? scroll : 0;
     panelKey = mk;
     syncUndo();
     $('#randBtn').hidden = !gen.params.some((d) => d.type === 'seed' || (d.type === 'list' && d.item.some((i) => i.type === 'seed')));
     syncPresets();
-    if (nm || sg) $('#presetBar').hidden = true;
+    if (nm || sg || mt) $('#presetBar').hidden = true;
+  }
+
+  /* Output tab: the global Saturation / Colors settings (js/post.js) join the panel's Output section (or get
+     one). They are not part of the tab's params: a proxy routes them to S, and changing them is no undo step. */
+  const POST_SAT = '__out_sat', POST_COL = '__out_colors', OUT_RE = /\boutput\b/i;
+  function postDefs(derived) {
+    const d = [];
+    // derived maps (normal, smoothness, metallic) are not color images: no saturation there
+    if (!derived) d.push({ key: POST_SAT, label: 'Saturation', type: 'int', min: 0, max: 200, default: 100, neutral: 100, fmt: (v) => v + ' %', parse: (t) => parseFloat(t), tip: 'Saturation of the preview and every export: 0 % = grayscale. Applies to all tabs (double-click to reset)' });
+    d.push({
+      key: POST_COL, label: 'Colors', type: 'int', min: 2, max: COLORS_MAX, default: COLORS_MAX, neutral: COLORS_MAX,
+      fmt: (v) => (v >= COLORS_MAX ? U.t('All') : String(v)),
+      parse: (t) => (!t.trim() || isNaN(parseFloat(t)) ? COLORS_MAX : parseFloat(t)), // "All" / empty = all colors
+      tip: 'Reduce the preview and every export to at most this many colors (optimal palette, posterized, alpha untouched). At the right end: all colors. Applies to all tabs (double-click to reset)',
+    });
+    return d;
+  }
+  function withPost(defs, derived) {
+    const post = postDefs(derived), i = defs.findIndex((d) => d.type === 'section' && OUT_RE.test(d.label));
+    if (i < 0) return defs.concat([{ type: 'section', label: 'Output' }], post);
+    let j = i + 1;
+    while (j < defs.length && defs[j].type !== 'section') j++;
+    return defs.slice(0, j).concat(post, defs.slice(j));
+  }
+  function inspect(root, defs, vals, change, collapsed, derived) {
+    let postKey = '';
+    const pv = new Proxy(vals, {
+      get: (t, k) => (k === POST_SAT ? Math.round(S.saturation * 100) : k === POST_COL ? S.colors : t[k]),
+      set: (t, k, v) => { if (k === POST_SAT) { S.saturation = v / 100; postKey = k; } else if (k === POST_COL) { S.colors = v; postKey = k; } else t[k] = v; return true; },
+    });
+    return U.ui.build(root, withPost(defs, derived), pv, {
+      change: (rebuild) => { if (postKey) { postKey = ''; onPostChange(); return; } change(rebuild); },
+      collapsed, persist: save,
+    });
+  }
+  function onPostChange() {
+    if (refreshVis) refreshVis();
+    scheduleRender(true);
+    save();
   }
 
   const sheetDesc = (tab) => U.getGen(tab.type).animLoop
@@ -304,11 +354,12 @@
     const alt = [];
     if (hasNormal(gen)) alt.push(['normal', 'Normal map']);
     if (U.hasSmooth(gen)) alt.push(['smooth', 'Smoothness']);
+    if (U.hasMetal(gen)) alt.push(['metal', 'Metallic']);
     if (hasSheet(gen)) alt.push(['sheet', 'Tilesheet']);
     if (!alt.length) return null;
-    return [['plain', hasNormal(gen) || U.hasSmooth(gen) ? 'Texture' : 'Single frame']].concat(alt);
+    return [['plain', hasNormal(gen) || U.hasSmooth(gen) || U.hasMetal(gen) ? 'Texture' : 'Single frame']].concat(alt);
   }
-  const modeOf = (tab) => (normalOn(tab) ? 'normal' : smoothOn(tab) ? 'smooth' : sheetOn(tab) ? 'sheet' : 'plain');
+  const modeOf = (tab) => (normalOn(tab) ? 'normal' : smoothOn(tab) ? 'smooth' : metalOn(tab) ? 'metal' : sheetOn(tab) ? 'sheet' : 'plain');
 
   function syncModeBar(tab, gen) {
     const modes = modesFor(gen), seg = $('#modeSeg');
@@ -334,6 +385,8 @@
     tab.normal.on = mode === 'normal';
     if (!tab.smooth) tab.smooth = newSmooth(gen);
     tab.smooth.on = mode === 'smooth';
+    if (!tab.metal) tab.metal = newMetal(gen);
+    tab.metal.on = mode === 'metal';
     tab.sheet.on = mode === 'sheet';
     if (mode === 'sheet') tab.view.sections.__tab = 'Tilesheet';
     buildPanel();
@@ -437,18 +490,24 @@
     const gen = U.getGen(tab.type);
     if (sheetOn(tab)) return U.renderSheet(gen, tab.params, tab.sheet, W, H, { preview });
     const c = U.canvas(W, H);
-    const info = gen.render(c.getContext('2d'), W, H, tab.params, { preview, layer }) || {};
-    if (normalOn(tab)) {
-      // generators with `heightMap: true` render their own height map (e.g. impact decals without the smoke stain);
-      // all others use the texture itself as height
-      let src = c;
-      if (gen.heightMap) { src = U.canvas(W, H); gen.render(src.getContext('2d'), W, H, tab.params, { preview, height: true }); }
-      return { canvas: U.normalMap(src, tab.normal.params), info: Object.assign({}, info, { normal: true }) };
-    }
+    // generators with `heightMap: true` render their own height map for the normal map (e.g. impact decals
+    // without the smoke stain); then the color texture is not needed at all. All others use the texture as height
+    const ownHeight = normalOn(tab) && gen.heightMap;
+    const info = gen.render(c.getContext('2d'), W, H, tab.params, ownHeight ? { preview, height: true } : { preview, layer }) || {};
+    if (normalOn(tab)) return { canvas: U.normalMap(c, tab.normal.params), info: Object.assign({}, info, { normal: true }) };
+    // smoothness / metallic: the height map or one of the generator's own sources (`mapSources`) is rendered separately
+    const ownSource = (src) => {
+      const own = src === 'height' ? gen.heightMap && { height: true } : (gen.mapSources || []).some(([id]) => id === src) && { source: src };
+      if (!own) return null;
+      const s = U.canvas(W, H);
+      gen.render(s.getContext('2d'), W, H, tab.params, Object.assign({ preview }, own));
+      return s;
+    };
     if (smoothOn(tab)) {
-      let hsrc = null;
-      if (tab.smooth.params.source === 'height' && gen.heightMap) { hsrc = U.canvas(W, H); gen.render(hsrc.getContext('2d'), W, H, tab.params, { preview, height: true }); }
-      return { canvas: U.smoothMap(c, tab.smooth.params, hsrc), info: Object.assign({}, info, { smooth: tab.smooth.params.roughness ? 'roughness' : 'smoothness' }) };
+      return { canvas: U.smoothMap(c, tab.smooth.params, ownSource(tab.smooth.params.source)), info: Object.assign({}, info, { smooth: tab.smooth.params.roughness ? 'roughness' : 'smoothness' }) };
+    }
+    if (metalOn(tab)) {
+      return { canvas: U.metalMap(c, tab.metal.params, ownSource(tab.metal.params.source)), info: Object.assign({}, info, { metal: true }) };
     }
     return { canvas: c, info };
   }
@@ -505,6 +564,7 @@
     let res;
     try {
       res = atExport ? renderOutput(tab, W, H, true) : renderTab(tab, W, H, true);
+      U.postProcess(res.canvas, postOpts(tab));
     } catch (e) {
       console.error(e);
       toast(U.t('Render error: {0}', e.message));
@@ -537,7 +597,7 @@
         gen.render(src.getContext('2d'), W, H, tab.params, { preview: true, glNormal: true });
       } catch (e) { console.error(e); return; }
     }
-    U.glPreview.update(src, tab.params, gen);
+    U.glPreview.update(src, tab.params, gen, lastBuf);
   }
 
   // While dragging a slider on a slow generator, render a half-res draft, then refine when idle.
@@ -677,6 +737,9 @@
     if (lastInfo.hotspot) parts.push(U.t('Hotspot @ export: {0}', `${Math.floor(lastInfo.hotspot[0] * eW)}, ${Math.floor(lastInfo.hotspot[1] * eH)}`));
     if (pixelExport()) parts.push(U.t('hard pixels'));
     if (lastInfo.smooth) parts.push(U.t(lastInfo.smooth === 'roughness' ? 'roughness map' : 'smoothness map'));
+    if (lastInfo.metal) parts.push(U.t('metallic map'));
+    if (satActive(tab)) parts.push(U.t('saturation {0} %', Math.round(S.saturation * 100)));
+    if (S.colors < COLORS_MAX) parts.push(U.t('{0} colors', S.colors));
     if (lastInfo.normal) parts.push(U.t('normal map ({0})', tab.normal.params.yDir === 'dx' ? 'DirectX' : 'OpenGL'));
     if (lastInfo.text) parts.push(lastInfo.text.replace(/\b(bricks|cells|paths)\b/g, (w) => U.t(w)));
     $('#statusInfo').textContent = parts.join('  ·  ');
@@ -862,6 +925,15 @@
         save();
         return;
       }
+      if (metalOn(t)) {
+        if (!confirm(U.t('Reset the metallic settings to the suggestion for this generator?'))) return;
+        t.metal.params = U.metalDefaults(U.getGen(t.type));
+        markDirty(t);
+        buildPanel();
+        renderPreview(1);
+        save();
+        return;
+      }
       if (normalOn(t)) {
         if (!confirm(U.t('Reset the normal map settings to defaults?'))) return;
         t.normal.params = U.normalDefaults(U.getGen(t.type));
@@ -939,6 +1011,12 @@
 
   function onKey(e) {
     const typing = /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName);
+    // Ctrl+K or /: jump to the generator search
+    if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') || (e.key === '/' && !typing)) {
+      e.preventDefault();
+      focusSearch();
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
       e.preventDefault();
       if (cur()) doExport(false);
@@ -986,25 +1064,49 @@
     card.addEventListener('pointerleave', () => card.classList.remove('holo'));
   }
 
-  const thumbCache = new Map();
+  /* thumbnails don't depend on the language: rendered once per generator, then copied. Rendering all of them
+     up front blocked the page for seconds at startup, so they are rendered in small time slices after the grid
+     is shown, cards in view first. */
+  const thumbCache = new Map(), thumbQueue = [];
+  let thumbTimer = 0;
+  function putThumb(thumb, src) {
+    const c = U.canvas(src.width, src.height);
+    c.getContext('2d').drawImage(src, 0, 0);
+    thumb.append(c);
+  }
+  function queueThumb(gen, thumb) {
+    const src = thumbCache.get(gen.id);
+    if (src) { putThumb(thumb, src); return; }
+    thumbQueue.push([gen, thumb]);
+    if (!thumbTimer) thumbTimer = setTimeout(pumpThumbs, 0);
+  }
+  const inView = (e) => { if (!e.offsetParent) return false; const r = e.getBoundingClientRect(); return r.bottom > 0 && r.top < window.innerHeight; };
+  function pumpThumbs() {
+    thumbTimer = 0;
+    const t0 = performance.now();
+    while (thumbQueue.length && performance.now() - t0 < 30) {
+      const k = Math.max(0, thumbQueue.findIndex(([, th]) => inView(th)));
+      const [gen, thumb] = thumbQueue.splice(k, 1)[0];
+      if (!thumb.isConnected) continue; // its grid was rebuilt (language switch)
+      let src = thumbCache.get(gen.id);
+      if (!src) {
+        try {
+          const [W, H] = dims(gen.aspect || '1:1', 128);
+          src = renderTab({ type: gen.id, params: U.defaultsFor(gen.params) }, W, H, true).canvas;
+          thumbCache.set(gen.id, src);
+        } catch (e) { console.error(e); continue; }
+      }
+      putThumb(thumb, src);
+    }
+    if (thumbQueue.length) thumbTimer = setTimeout(pumpThumbs, 0);
+  }
   function genGrid(container, onPick) {
     container.innerHTML = '';
     for (const gen of U.generators) {
       const card = el('button', 'gen-card');
       card.type = 'button';
       const thumb = el('div', 'gen-thumb bg-' + (gen.bg || 'checker'));
-      try {
-        // thumbnails don't depend on the language: rendered once per generator, then copied
-        let src = thumbCache.get(gen.id);
-        if (!src) {
-          const [W, H] = dims(gen.aspect || '1:1', 128);
-          src = renderTab({ type: gen.id, params: U.defaultsFor(gen.params) }, W, H, true).canvas;
-          thumbCache.set(gen.id, src);
-        }
-        const c = U.canvas(src.width, src.height);
-        c.getContext('2d').drawImage(src, 0, 0);
-        thumb.append(c);
-      } catch (e) { console.error(e); }
+      queueThumb(gen, thumb);
       const meta = el('div', 'gen-meta');
       const name = el('div', 'gen-name');
       const ic = el('span', 'gen-icon');
@@ -1019,6 +1121,8 @@
       meta.append(name, el('div', 'gen-desc', U.t(gen.desc)), foot);
       card.append(thumb, meta);
       card.dataset.tags = (gen.tags || []).join('|');
+      card.dataset.id = gen.id;
+      card._order = container.children.length; // grid order, restored when the search is cleared
       card.onclick = () => onPick(gen.id);
       holo(card);
       container.append(card);
@@ -1046,7 +1150,21 @@
      Shared by the welcome grid and the picker: one tag at a time; a generator shows when it carries
      the selected tag (or nothing is selected). Cards animate in / out when the filter changes. */
   const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const matches = (card) => !S.tags.length || card.dataset.tags.split('|').some((t) => S.tags.includes(t));
+  /* search (top right): fuzzy search over names, tags, descriptions and hidden keywords (js/search.js);
+     combined with the tag filter, matching cards are sorted by relevance */
+  let query = '', scores = null; // scores: generator id -> relevance, null without a query
+  function setQuery(q) {
+    query = q.trim();
+    scores = query ? new Map(U.generators.map((g) => [g.id, U.searchGen(g, query)])) : null;
+  }
+  const score = (card) => (scores ? scores.get(card.dataset.id) || 0 : 1);
+  const matches = (card) => (!S.tags.length || card.dataset.tags.split('|').some((t) => S.tags.includes(t))) && score(card) > 0;
+  const filtering = () => !!S.tags.length || !!query;
+  // by relevance while searching (ties keep the grid order), else the grid order
+  function sortGrid(grid) {
+    const cards = [...grid.children], sorted = cards.slice().sort((a, b) => (scores ? score(b) - score(a) : 0) || a._order - b._order);
+    if (sorted.some((c, i) => c !== cards[i])) grid.append(...sorted);
+  }
 
   /* FLIP animation: remember where every visible card is (mid-animation positions included), apply the
      new filter in one go, then let staying cards glide from their old to their new place. Leaving cards
@@ -1062,6 +1180,7 @@
   function filterGrid(grid, animate) {
     const cards = [...grid.children];
     if (!animate || reduceMotion() || !grid.offsetParent) {
+      sortGrid(grid);
       for (const c of cards) { c.getAnimations().forEach((a) => a.cancel()); unpin(c); c.hidden = !matches(c); }
       fitTitles(grid);
       return;
@@ -1071,6 +1190,7 @@
     const gb = grid.getBoundingClientRect(), first = new Map();
     for (const c of cards) if (!c.hidden) first.set(c, c.getBoundingClientRect());
     for (const c of cards) { c.getAnimations().forEach((a) => a.cancel()); unpin(c); }
+    sortGrid(grid);
 
     // apply the filter: leaving cards are pinned at their old spot, out of the layout flow
     const leaving = [], entering = [], staying = [];
@@ -1109,8 +1229,12 @@
       const grid = document.getElementById(bar.dataset.grid);
       for (const b of bar.querySelectorAll('.tag-chip')) b.classList.toggle('on', S.tags.includes(b.dataset.tag));
       const n = [...grid.children].filter(matches).length;
-      bar.querySelector('.tag-count').textContent = S.tags.length ? U.t('{0} of {1}', n, grid.children.length) : U.t('All {0}', grid.children.length);
-      bar.querySelector('.tag-reset').disabled = !S.tags.length;
+      bar.querySelector('.tag-reset').hidden = !filtering();
+      // nothing found: say so under the filter bar
+      let none = bar.nextElementSibling && bar.nextElementSibling.classList.contains('search-none') ? bar.nextElementSibling : null;
+      if (!none) { none = el('p', 'search-none'); bar.after(none); }
+      none.hidden = n > 0 || !query;
+      none.textContent = U.t('No generator matches "{0}"', query);
     }
   }
 
@@ -1134,18 +1258,72 @@
         b.onclick = () => setTags(S.tags.includes(t) ? [] : [t]); // one tag at a time
         chips.append(b);
       }
-      const reset = el('button', 'btn small ghost tag-reset', U.t('Reset filter'));
+      // compact reset (×), only shown while a tag or a search is active
+      const reset = el('button', 'tag-reset', '×');
       reset.type = 'button';
-      reset.onclick = () => setTags([]);
-      bar.append(el('span', 'tag-label', U.t('Filter')), chips, el('span', 'tag-count'), reset);
+      reset.title = U.t('Reset filter');
+      reset.setAttribute('aria-label', U.t('Reset filter'));
+      reset.onclick = () => { if (query) clearSearch(); setTags([]); };
+      bar.append(chips, reset, searchField());
     }
     syncTagBars();
+  }
+
+  /* the search field, at the right end of each filter bar (landing page and picker; both show the same
+     query). Enter opens the best match, ↓ moves into the results, Esc clears. */
+  const searchInputs = () => [...document.querySelectorAll('.gen-search input')];
+  const visibleGrid = () => (!$('#picker').hidden ? $('#pickerGrid') : document.body.classList.contains('empty') ? $('#welcomeGrid') : null);
+  let searchTimer = 0;
+  function runSearch(value) {
+    clearTimeout(searchTimer);
+    setQuery(value);
+    for (const i of searchInputs()) if (i.value !== value) i.value = value;
+    for (const bar of document.querySelectorAll('.tag-bar')) filterGrid(document.getElementById(bar.dataset.grid), true);
+    syncTagBars();
+  }
+  function clearSearch() {
+    for (const i of searchInputs()) i.value = '';
+    setQuery('');
+  }
+  function searchField() {
+    const wrap = el('div', 'gen-search');
+    wrap.title = U.t('Search generators by name, use or keyword, e.g. plane, earth, blood (Ctrl+K)');
+    wrap.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>';
+    const inp = el('input');
+    Object.assign(inp, { type: 'search', autocomplete: 'off', spellcheck: false, value: query, placeholder: U.t('Search generators…') });
+    inp.setAttribute('aria-label', U.t('Search generators'));
+    wrap.append(inp);
+    inp.oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => runSearch(inp.value), 70); };
+    inp.onsearch = () => runSearch(inp.value); // the field's own clear (×) button
+    inp.onkeydown = (e) => {
+      e.stopPropagation(); // typing here never triggers the app shortcuts
+      if (e.key === 'Escape') { if (inp.value) runSearch(''); else { inp.blur(); if (!$('#picker').hidden) closePicker(); } e.preventDefault(); return; }
+      if (e.key === 'Enter' || e.key === 'ArrowDown') {
+        runSearch(inp.value);
+        const g = visibleGrid(), first = g && [...g.children].find((c) => !c.hidden);
+        if (!first) return;
+        e.preventDefault();
+        if (e.key === 'Enter') first.click(); else first.focus();
+      }
+    };
+    return wrap;
+  }
+  // Ctrl+K / "/": the search of the visible grid; with a texture open, the picker opens for it
+  function focusSearch() {
+    if (!visibleGrid()) openPicker();
+    const bar = document.querySelector(`.tag-bar[data-grid="${visibleGrid().id}"]`), inp = bar && bar.querySelector('.gen-search input');
+    if (inp) { inp.focus(); inp.select(); }
+  }
+  // picking a generator from search results starts the next search fresh
+  function pickGen(id) {
+    if (query) { clearSearch(); for (const bar of document.querySelectorAll('.tag-bar')) filterGrid(document.getElementById(bar.dataset.grid), false); syncTagBars(); }
+    createTab(id);
   }
 
   let pickerBuilt = false;
   function openPicker() {
     if (!pickerBuilt) {
-      genGrid($('#pickerGrid'), (id) => { closePicker(); createTab(id); });
+      genGrid($('#pickerGrid'), (id) => { closePicker(); pickGen(id); });
       pickerBuilt = true;
       syncTagBars();
     }
@@ -1178,6 +1356,7 @@
       const names = [];
       for (const layer of layers) {
         let { canvas } = renderOutput(tab, W, H, false, layer ? layer.id : undefined);
+        U.postProcess(canvas, postOpts(tab));
         if (fmt[0] === 'image/jpeg') {
           // JPEG has no alpha: flatten onto black
           const flat = U.canvas(canvas.width, canvas.height), g = flat.getContext('2d');
@@ -1195,7 +1374,7 @@
         }
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        const suffix = normalOn(tab) ? '_normal' : smoothOn(tab) ? (tab.smooth.params.roughness ? '_roughness' : '_smoothness') : sheetOn(tab) ? `_sheet${tab.sheet.grid}x${tab.sheet.grid}` : layer ? '_' + layer.suffix : '';
+        const suffix = normalOn(tab) ? '_normal' : smoothOn(tab) ? (tab.smooth.params.roughness ? '_roughness' : '_smoothness') : metalOn(tab) ? '_metallic' : sheetOn(tab) ? `_sheet${tab.sheet.grid}x${tab.sheet.grid}` : layer ? '_' + layer.suffix : '';
         a.download = `${safeName(tabName(tab))}${suffix}_${canvas.width}x${canvas.height}.${fmt[1]}`;
         document.body.append(a);
         a.click();
@@ -1237,7 +1416,7 @@
     saveT = 0;
     try {
       localStorage.setItem(STORE, JSON.stringify({
-        tabs: S.tabs, active: S.active, previewRes: S.previewRes, exportSize: S.exportSize, format: S.format, hardPixels: S.hardPixels, tags: S.tags,
+        tabs: S.tabs, active: S.active, previewRes: S.previewRes, exportSize: S.exportSize, format: S.format, hardPixels: S.hardPixels, tags: S.tags, saturation: S.saturation, colors: S.colors,
       }));
     } catch (e) { /* storage unavailable: session just isn't remembered */ }
   }
@@ -1264,6 +1443,8 @@
     if (typeof d.hardPixels === 'boolean') S.hardPixels = d.hardPixels;
     if (SIZES.some((s) => s[0] === d.exportSize)) S.exportSize = d.exportSize;
     if (FORMATS[d.format]) S.format = d.format;
+    if (typeof d.saturation === 'number' && isFinite(d.saturation)) S.saturation = U.clamp(d.saturation, 0, 2);
+    if (typeof d.colors === 'number' && isFinite(d.colors)) S.colors = Math.round(U.clamp(d.colors, 2, COLORS_MAX));
     if (Array.isArray(d.tags)) S.tags = d.tags.filter((t) => U.TAGS.includes(t)).slice(0, 1);
     for (const t of d.tabs || []) {
       const gen = U.getGen(t.type);
@@ -1279,6 +1460,7 @@
         preset: typeof t.preset === 'string' ? t.preset : null,
         normal: newNormal(gen, t.normal),
         smooth: newSmooth(gen, t.smooth),
+        metal: newMetal(gen, t.metal),
         sheet: newSheet(t.sheet),
       };
       if (d.active === t.id) S.active = tab.id;
@@ -1380,7 +1562,7 @@
     U.setLang(code);
     U.applyI18n();
     buildLangBar();
-    genGrid($('#welcomeGrid'), (id) => createTab(id));
+    genGrid($('#welcomeGrid'), (id) => pickGen(id));
     $('#pickerGrid').innerHTML = '';
     pickerBuilt = false; // rebuilt in the new language the next time it opens
     buildTagBars();
@@ -1393,7 +1575,7 @@
   U.applyI18n();
   buildLangBar();
   buildChrome();
-  genGrid($('#welcomeGrid'), (id) => createTab(id));
+  genGrid($('#welcomeGrid'), (id) => pickGen(id));
   startHero();
   load();
   filterGrid($('#welcomeGrid'), false); // apply the saved tag filter

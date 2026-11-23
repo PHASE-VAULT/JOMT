@@ -24,7 +24,7 @@
     name: 'Dirt',
     desc: 'Tileable dry soil with clods, granules, pebbles, stones, twigs, leaves, roots, grass bits and plowed furrows',
     uses: ['Albedo and height textures for dirt paths, fields, forest floors, desert ground and terrain layers; the height drives the normal map mode or terrain height blending.', 'Ground tiles for top-down, strategy and survival games.'],
-    tags: ['Texturing', 'Nature'],
+    tags: ['PBR', 'Nature'],
     tileable: true,
     heightMap: true,
     icon: U.icon('<path d="M3 17c3-2 6-2 9 0s6 2 9 0"/><circle cx="7" cy="12" r="1.6"/><circle cx="15" cy="10" r="1.1"/><circle cx="18" cy="14" r=".8"/><path d="M9 8l4 1" opacity=".6"/>'),

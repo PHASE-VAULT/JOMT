@@ -1,179 +1,250 @@
-/* Moss: tileable moss carpets and patches. Coverage patches with fuzzy, tufted edges; cushion clumps
-   (Voronoi domes with dark crevices between them); a fine leafy micro-structure of tiny star-like
-   tips and strands; dry / bleached areas, color variation per clump and sporophyte capsules.
-   Grows over stone, soil, bark or a flat color, or exports as a transparent overlay / mask.
-   Height map for the normal map mode. All noise uses whole periods per tile, so it repeats seamlessly. */
+/* Moss: tileable, fully covered moss carpets, from tight cushion moss to flat top-down carpets.
+   Built from thousands of tiny star-shaped fronds (a stem top with curling arms and feathery side
+   leaflets) splatted into a height buffer: every pixel keeps the highest frond over it, so fronds
+   overlap and occlude like real moss and the result looks fluffy instead of noisy. The fronds sit on
+   cushion mounds (warped Voronoi domes with crevices) and medium tufts. Ambient occlusion comes from the
+   real height buffer (frond scale + cushion scale) with its own strength. Color: dark depths, mid green,
+   bright tips, a soft non-directional fuzz sheen on the canopy, color variation, dry patches and dead
+   brown fronds. Output: color, height map or AO map. Everything wraps, so it tiles seamlessly, and all
+   sizes are relative to the texture, so preview and export match.
+   Shine: use the Smoothness and Metallic modes (suggested ranges make the bright tips a little glossy). */
 (function () {
   'use strict';
   const U = window.UGTG;
   const { clamp, smoothstep, lerp } = U;
   const V = { id: 0, e: 0, es: 0, f1: 0, ci: 0, cj: 0, px: 0, py: 0 };
 
-  const GROUNDS = { stone: ['#6f6d66', '#4a4844'], soil: ['#4a3826', '#2c2015'], bark: ['#4a3a2c', '#241b14'], color: ['#3a3226', '#3a3226'] };
+  // box blur with wrap (separable, running sums), in place; r in px
+  function blurWrap(a, W, H, r) {
+    if (r < 1) return;
+    const tmp = new Float32Array(a.length), inv = 1 / (2 * r + 1);
+    const wx = (n, len) => { const t = new Int32Array(len + 2 * r + 2); for (let i = 0; i < t.length; i++) t[i] = U.mod(i - r - 1, n); return t; }; // index i - r - 1 wrapped
+    const WX = wx(W, W), WY = wx(H, H);
+    for (let y = 0; y < H; y++) {
+      const o = y * W;
+      let s = 0;
+      for (let k = -r; k <= r; k++) s += a[o + WX[k + r + 1]];
+      for (let x = 0; x < W; x++) { tmp[o + x] = s * inv; s += a[o + WX[x + 2 * r + 2]] - a[o + WX[x + 1]]; }
+    }
+    for (let x = 0; x < W; x++) {
+      let s = 0;
+      for (let k = -r; k <= r; k++) s += tmp[WY[k + r + 1] * W + x];
+      for (let y = 0; y < H; y++) { a[y * W + x] = s * inv; s += tmp[WY[y + 2 * r + 2] * W + x] - tmp[WY[y + 1] * W + x]; }
+    }
+  }
 
   U.register({
     id: 'moss',
     name: 'Moss',
-    desc: 'Tileable moss carpets and patches with cushion clumps, leafy detail, dry tips and spore capsules over stone, soil or bark',
-    uses: ['Albedo and height textures for mossy rocks, forest floors, roofs, ruins and tree bark; blend the overlay output on top of other materials through a mask.', 'Ground cover and decal sheets for stylized nature scenes.'],
-    tags: ['Texturing', 'Nature'],
+    desc: 'Fluffy, fully covered moss: cushion mounds or flat carpets built from layered star-shaped fronds, with AO, bright tips, dry patches and dead bits',
+    uses: ['Albedo, height and AO textures for mossy rocks, forest floors, roofs, ruins and logs; pair with the Smoothness and Metallic modes for the soft sheen of moss tips.', 'Ground cover for stylized nature scenes and terrain layers.'],
+    tags: ['PBR', 'Nature'],
     tileable: true,
     heightMap: true,
+    // extra source for the smoothness / metallic maps: the leaf tips at the top of the canopy
+    mapSources: [['tips', 'Leaf tips']],
     icon: U.icon('<path d="M3 17c2-3 4-3 6-1 1-3 4-4 6-1 2-2 4-1 6 1"/><path d="M3 20h18" opacity=".5"/><circle cx="8" cy="10" r="1"/><circle cx="14" cy="8" r="1"/><path d="M8 11v3M14 9v4" opacity=".6"/>'),
     params: [
       { type: 'section', label: 'Moss' },
-      { key: 'coverage', label: 'Coverage', type: 'range', min: 0, max: 1, step: 0.01, default: 0.75, tip: '1 = solid carpet, low values = scattered patches' },
-      { key: 'patchScale', label: 'Patch scale', type: 'int', min: 1, max: 16, default: 3, tip: 'Patches across the texture' },
-      { key: 'edgeSoft', label: 'Edge fuzz', type: 'range', min: 0, max: 1, step: 0.01, default: 0.45, tip: 'Tufted, broken-up patch edges' },
-      { key: 'clumps', label: 'Cushion scale', type: 'int', min: 2, max: 80, default: 14, tip: 'Moss cushions across the texture' },
-      { key: 'clumpDepth', label: 'Crevice depth', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6, tip: 'Dark gaps between the cushions' },
-      { key: 'fibers', label: 'Leafy detail', type: 'range', min: 0, max: 1, step: 0.01, default: 0.7 },
-      { key: 'fiberScale', label: 'Detail scale', type: 'int', min: 20, max: 300, default: 110, show: (p) => p.fibers > 0, tip: 'Tiny leaf tips across the texture' },
-      { key: 'spores', label: 'Spore capsules', type: 'range', min: 0, max: 1, step: 0.01, default: 0, tip: 'Sporophytes: tiny capsules on stalks, seen from above' },
+      { key: 'cushions', label: 'Cushion scale', type: 'int', min: 1, max: 40, default: 4, tip: 'Moss cushions (mounds) across the texture' },
+      { key: 'cushionHeight', label: 'Cushion height', type: 'range', min: 0, max: 1, step: 0.01, default: 0.65, tip: '0 = flat carpet, 1 = tall, round pillows' },
+      { key: 'crevice', label: 'Crevice depth', type: 'range', min: 0, max: 1, step: 0.01, default: 0.7, tip: 'How deep the gaps between the cushions dip' },
+      { key: 'tufts', label: 'Tufts', type: 'range', min: 0, max: 1, step: 0.01, default: 0.45, tip: 'Smaller lumps on the cushions' },
+      { key: 'fronds', label: 'Frond scale', type: 'int', min: 20, max: 260, default: 80, tip: 'Moss fronds (tiny star-shaped sprigs) across the texture' },
+      { key: 'density', label: 'Density', type: 'range', min: 0.6, max: 3, step: 0.05, default: 1.7, tip: 'Fronds per spot: higher = denser, more layered, fewer dark gaps' },
+      { key: 'arms', label: 'Leaflets', type: 'int', min: 3, max: 12, default: 7, tip: 'Arms per frond' },
+      { key: 'fluff', label: 'Fluffiness', type: 'range', min: 0, max: 1, step: 0.01, default: 0.65, tip: 'Curling arms and feathery side leaflets' },
+      { key: 'thickness', label: 'Strand thickness', type: 'range', min: 0.3, max: 2, step: 0.05, default: 0.75 },
+      { key: 'dead', label: 'Dead bits', type: 'range', min: 0, max: 1, step: 0.01, default: 0.12, tip: 'Brown, dead fronds mixed into the carpet' },
       { key: 'seed', label: 'Seed', type: 'seed', default: 21 },
 
       { type: 'section', label: 'Color' },
-      { key: 'dark', label: 'Shadow color', type: 'color', default: '#1b3010' },
-      { key: 'mid', label: 'Moss color', type: 'color', default: '#4b7420' },
-      { key: 'tip', label: 'Tip color', type: 'color', default: '#a4c443' },
-      { key: 'tipAmt', label: 'Bright tips', type: 'range', min: 0, max: 1, step: 0.01, default: 0.55 },
-      { key: 'dry', label: 'Dry color', type: 'color', default: '#a39c52' },
-      { key: 'dryAmt', label: 'Dry patches', type: 'range', min: 0, max: 1, step: 0.01, default: 0.25 },
-      { key: 'colorVar', label: 'Cushion variation', type: 'range', min: 0, max: 1, step: 0.01, default: 0.35 },
-      { key: 'sporeColor', label: 'Capsule color', type: 'color', default: '#b0582a', show: (p) => p.spores > 0 },
+      { key: 'dark', label: 'Depth color', type: 'color', default: '#1a3a0e', tip: 'Color deep inside the moss' },
+      { key: 'mid', label: 'Moss color', type: 'color', default: '#4c8a1e' },
+      { key: 'tip', label: 'Tip color', type: 'color', default: '#a8d43c' },
+      { key: 'tipAmt', label: 'Bright tips', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6 },
+      { key: 'sheen', label: 'Fuzz sheen', type: 'range', min: 0, max: 1, step: 0.01, default: 0.35, tip: 'Soft, non-directional glow on the top of the canopy (light caught by the tiny leaf tips)' },
+      { key: 'colorVar', label: 'Color variation', type: 'range', min: 0, max: 1, step: 0.01, default: 0.4, tip: 'Per frond and in broad patches' },
+      { key: 'dry', label: 'Dry color', type: 'color', default: '#a7a04e' },
+      { key: 'dryAmt', label: 'Dry patches', type: 'range', min: 0, max: 1, step: 0.01, default: 0.15 },
+      { key: 'deadColor', label: 'Dead color', type: 'color', default: '#7a4a24', show: (p) => p.dead > 0 },
 
-      { type: 'section', label: 'Ground' },
-      { key: 'ground', label: 'Ground', type: 'select', default: 'stone', options: [['stone', 'Stone'], ['soil', 'Soil'], ['bark', 'Bark'], ['color', 'Flat color']], apply: (v, p) => { const g = GROUNDS[v]; if (g) { p.ground1 = g[0]; p.ground2 = g[1]; } } },
-      { key: 'ground1', label: 'Ground color', type: 'color', default: GROUNDS.stone[0] },
-      { key: 'ground2', label: 'Second color', type: 'color', default: GROUNDS.stone[1], show: (p) => p.ground !== 'color' },
-      { key: 'groundScale', label: 'Ground scale', type: 'int', min: 1, max: 24, default: 4, show: (p) => p.ground !== 'color' },
-      { key: 'shadow', label: 'Contact shadow', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, tip: 'Darkens the ground around the moss edges' },
+      { type: 'section', label: 'Shading' },
+      { key: 'ao', label: 'AO strength', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6, tip: 'Ambient occlusion: darkens the gaps between fronds and the crevices between cushions' },
+      { key: 'aoSize', label: 'AO spread', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, show: (p) => p.ao > 0, tip: 'Low = only the tight gaps between fronds, high = also broad shading between cushions' },
 
       { type: 'section', label: 'Output' },
-      { key: 'output', label: 'Output', type: 'select', default: 'color', options: [['color', 'Moss on ground'], ['overlay', 'Moss only (transparent)'], ['mask', 'Coverage mask']], tip: 'Overlay keeps only the moss with its coverage as alpha, for layering in a shader' },
+      { key: 'output', label: 'Output', type: 'select', default: 'color', options: [['color', 'Color (albedo + AO)'], ['albedo', 'Flat albedo (no AO)'], ['height', 'Height map'], ['aomap', 'AO map']], tip: 'Albedo, height and AO for a PBR material; smoothness and metallic come from the mode switch above' },
     ],
     presets: [
-      { name: 'Mossy stone', group: 'Realistic', values: {} },
-      { name: 'Forest floor carpet', group: 'Realistic', values: { coverage: 0.95, ground: 'soil', ground1: GROUNDS.soil[0], ground2: GROUNDS.soil[1], clumps: 10, dryAmt: 0.35, spores: 0.35 } },
-      { name: 'Cushion moss', group: 'Realistic', values: { coverage: 0.7, clumps: 6, clumpDepth: 0.85, fibers: 0.8, fiberScale: 140, mid: '#557f24', tip: '#b2d04a', patchScale: 4 } },
-      { name: 'Thin moss on rock', group: 'Realistic', values: { coverage: 0.42, patchScale: 5, edgeSoft: 0.7, clumps: 24, clumpDepth: 0.3, fibers: 0.5, tipAmt: 0.3, groundScale: 6 } },
-      { name: 'Moss on bark', group: 'Realistic', values: { coverage: 0.55, patchScale: 3, ground: 'bark', ground1: GROUNDS.bark[0], ground2: GROUNDS.bark[1], groundScale: 8, clumps: 20, dryAmt: 0.15 } },
-      { name: 'Dry summer moss', group: 'Realistic', values: { coverage: 0.8, dryAmt: 0.75, dry: '#9a8f48', mid: '#5f6e2a', tip: '#b7b260', spores: 0.2 } },
-      { name: 'Peat / sphagnum', group: 'Realistic', values: { coverage: 1, clumps: 18, clumpDepth: 0.5, mid: '#7a7a2a', dark: '#3a2a12', tip: '#c0a04a', dry: '#a0503a', dryAmt: 0.5, colorVar: 0.6, ground: 'soil', ground1: GROUNDS.soil[0], ground2: GROUNDS.soil[1] } },
-      { name: 'Wet rainforest moss', group: 'Realistic', values: { coverage: 1, dark: '#0f2a0c', mid: '#2f6a1a', tip: '#6eaa2a', tipAmt: 0.4, dryAmt: 0, clumps: 12, fibers: 0.9 } },
-      { name: 'Moss in a cobble joint', group: 'Realistic', values: { coverage: 0.35, patchScale: 8, edgeSoft: 0.8, clumps: 30, fibers: 0.6, groundScale: 10 } },
-      { name: 'Moss overlay', group: 'Masks', values: { coverage: 0.6, output: 'overlay' } },
-      { name: 'Coverage mask', group: 'Masks', values: { coverage: 0.55, output: 'mask' } },
-      { name: 'Toon moss', group: 'Stylized', values: { coverage: 0.7, clumps: 8, clumpDepth: 1, fibers: 0.15, fiberScale: 40, tipAmt: 0.8, dark: '#2a5a20', mid: '#4f9a2c', tip: '#a8e05a', dryAmt: 0, colorVar: 0.1, edgeSoft: 0.1, ground: 'color', ground1: '#7a7a8a' } },
-      { name: 'Glowing alien moss', group: 'Sci-fi', values: { coverage: 0.7, dark: '#0a1430', mid: '#2a4aa8', tip: '#5fe3f0', tipAmt: 0.9, dry: '#c03aff', dryAmt: 0.35, spores: 0.6, sporeColor: '#f0ff5a', ground: 'stone', ground1: '#2a2a30', ground2: '#141418' } },
-      { name: 'Toxic fungus mat', group: 'Sci-fi', values: { coverage: 0.85, clumps: 9, dark: '#1a2a08', mid: '#6a9a10', tip: '#d8ff3a', dry: '#ffb020', dryAmt: 0.3, spores: 0.8, sporeColor: '#ff3a8a', ground: 'soil', ground1: '#2a2018', ground2: '#141008' } },
+      { name: 'Cushion moss', group: 'Realistic', values: {} },
+      { name: 'Moss carpet (top-down)', group: 'Realistic', values: { cushions: 3, cushionHeight: 0.15, crevice: 0.2, tufts: 0.55, fronds: 95, density: 2, fluff: 0.75, thickness: 0.7, dead: 0.22, dark: '#26400c', mid: '#6a9a1c', tip: '#b8d63a', tipAmt: 0.65, sheen: 0.3, colorVar: 0.55, dryAmt: 0.1, deadColor: '#7a3f1e', ao: 0.7, aoSize: 0.25 } },
+      { name: 'Pillow moss', group: 'Realistic', values: { cushions: 3, cushionHeight: 0.85, crevice: 0.8, tufts: 0.3, fronds: 70, density: 2.2, dead: 0.04, mid: '#4f9a24', tip: '#b8e04a', sheen: 0.45, ao: 0.75, aoSize: 0.7 } },
+      { name: 'Fine sheet moss', group: 'Realistic', values: { cushions: 6, cushionHeight: 0.25, crevice: 0.3, tufts: 0.3, fronds: 180, density: 2.4, arms: 8, fluff: 0.5, thickness: 0.6, dead: 0.05, sheen: 0.25 } },
+      { name: 'Wet rainforest moss', group: 'Realistic', values: { cushions: 5, cushionHeight: 0.5, fronds: 70, fluff: 0.85, dark: '#0e260a', mid: '#2e6a18', tip: '#6eae2a', tipAmt: 0.45, sheen: 0.55, dryAmt: 0, dead: 0.03, ao: 0.75 } },
+      { name: 'Dry summer moss', group: 'Realistic', values: { dryAmt: 0.7, dry: '#9e9448', mid: '#617228', tip: '#b8b45e', dead: 0.3, deadColor: '#86592e', sheen: 0.15 } },
+      { name: 'Peat / sphagnum', group: 'Realistic', values: { cushions: 6, cushionHeight: 0.4, fronds: 55, arms: 5, fluff: 0.9, thickness: 1.1, mid: '#7a7a2a', dark: '#3a2a12', tip: '#c4a64c', dry: '#a0503a', dryAmt: 0.45, colorVar: 0.6, dead: 0.2 } },
+      { name: 'Coarse feather moss', group: 'Realistic', values: { cushions: 2, cushionHeight: 0.35, crevice: 0.4, fronds: 36, density: 1.6, arms: 9, fluff: 1, thickness: 1.2, dead: 0.15, mid: '#587e1e', tip: '#b2c84a' } },
+      { name: 'Moss height map', group: 'Maps', values: { output: 'height' } },
+      { name: 'Moss AO map', group: 'Maps', values: { output: 'aomap' } },
+      { name: 'Toon moss', group: 'Stylized', values: { cushions: 4, cushionHeight: 0.7, crevice: 0.9, fronds: 40, density: 1.4, arms: 5, fluff: 0.1, thickness: 1.6, tipAmt: 0.85, sheen: 0, dark: '#2a5a20', mid: '#4f9a2c', tip: '#a8e05a', dryAmt: 0, dead: 0, colorVar: 0.1, ao: 0.5 } },
+      { name: 'Glowing alien moss', group: 'Sci-fi', values: { dark: '#0a1430', mid: '#2a4aa8', tip: '#5fe3f0', tipAmt: 0.9, sheen: 0.7, dry: '#c03aff', dryAmt: 0.35, deadColor: '#f0ff5a', dead: 0.1 } },
+      { name: 'Toxic fungus mat', group: 'Sci-fi', values: { cushions: 6, fronds: 50, arms: 4, fluff: 0.3, thickness: 1.5, dark: '#1a2a08', mid: '#6a9a10', tip: '#d8ff3a', dry: '#ffb020', dryAmt: 0.3, dead: 0.3, deadColor: '#ff3a8a' } },
     ],
 
     render(ctx, W, H, p, opts) {
-      const height = !!(opts && opts.height), seed = p.seed | 0, ar = H / W;
+      const tipsOut = !!(opts && opts.source === 'tips'), heightOut = !tipsOut && (!!(opts && opts.height) || p.output === 'height'), seed = p.seed | 0, ar = H / W, S = Math.min(W, H), N = W * H;
       const per = (f) => [Math.max(1, Math.round(f)), Math.max(1, Math.round(f * ar))];
-      const [ppx, ppy] = per(p.patchScale), [clx, cly] = per(p.clumps), [fbx, fby] = per(p.fiberScale), [grx, gry] = per(p.groundScale);
-      const [dxp, dyp] = per(2), [spx, spy] = per(Math.round(Math.max(8, p.fiberScale * 0.35)));
-      const dark = U.hex(p.dark), mid = U.hex(p.mid), tip = U.hex(p.tip), dry = U.hex(p.dry), spc = U.hex(p.sporeColor);
-      const g1 = U.hex(p.ground1), g2 = U.hex(p.ground2);
-
-      // low-frequency fields on a coarse grid (cheap and resolution independent)
-      const patch = U.coarseField(W, H, 256, (x, y) => U.fractal('perlin', (x / W) * ppx, (y / H) * ppy, ppx, ppy, 5, 0.55, 'fbm', seed));
-      const dryF = p.dryAmt > 0 ? U.coarseField(W, H, 128, (x, y) => U.fractal('perlin', (x / W) * dxp, (y / H) * dyp, dxp, dyp, 4, 0.5, 'fbm', seed + 7)) : null;
+      const [clx, cly] = per(p.cushions), [fnx, fny] = per(p.fronds), [vpx, vpy] = per(Math.max(2, p.cushions * 0.7)), [dxp, dyp] = per(2);
       const half = (n) => Math.max(1, Math.round(n * 0.5)); // whole periods only, or the texture gets a seam
-      const wpx = half(clx), wpy = half(cly), hfx = half(fbx), hfy = half(fby), bly = half(gry);
+      const wpx = half(clx), wpy = half(cly);
+      const c2x = Math.max(1, Math.round(clx * 3)), c2y = Math.max(1, Math.round(cly * 3));
+
+      /* 1. the surface the fronds grow on: warped cushion domes with crevices + smaller tufts */
       const warpX = U.coarseField(W, H, 160, (x, y) => U.fractal('perlin', (x / W) * wpx, (y / H) * wpy, wpx, wpy, 3, 0.5, 'fbm', seed + 3) - 0.5);
       const warpY = U.coarseField(W, H, 160, (x, y) => U.fractal('perlin', (x / W) * wpx, (y / H) * wpy, wpx, wpy, 3, 0.5, 'fbm', seed + 4) - 0.5);
-      // crevice visibility varies, so the cushions don't read as a regular cell pattern
-      const crevF = U.coarseField(W, H, 160, (x, y) => U.fractal('perlin', (x / W) * clx, (y / H) * cly, clx, cly, 2, 0.5, 'fbm', seed + 8));
-      const c2x = Math.max(1, Math.round(clx * 2.3)), c2y = Math.max(1, Math.round(cly * 2.3));
-      const groundF = p.ground !== 'color' ? U.coarseField(W, H, 320, (x, y) => U.fractal('perlin', (x / W) * grx, (y / H) * gry, grx, gry, 5, 0.55, 'fbm', seed + 11)) : null;
+      const cellR = Math.min(W / clx, H / cly) * 0.5;
+      const surf = U.coarseField(W, H, 320, (x, y) => {
+        const u = x / W, v = y / H, i = Math.min(N - 1, Math.round(Math.min(H - 1, y)) * W + Math.round(Math.min(W - 1, x)));
+        U.voro(u * clx + warpX[i] * 1.5, v * cly + warpY[i] * 1.5, clx, cly, seed + 1, 1, false, W / clx, H / cly, cellR * 0.35, V);
+        const t1 = clamp(V.es / (cellR * 0.8)), dome = Math.sqrt(1 - (1 - t1) * (1 - t1));
+        const w2 = U.worley(u * c2x + warpY[i] * 2, v * c2y + warpX[i] * 2, c2x, c2y, seed + 2);
+        const tuft = Math.sqrt(clamp((w2.f2 - w2.f1) * 1.5));
+        return (1 - p.crevice * (1 - dome)) * p.cushionHeight * 0.55 + (tuft - 0.5) * p.tufts * 0.1;
+      });
 
-      const th = lerp(0.82, 0.18, clamp(p.coverage)), soft = 0.015 + p.edgeSoft * 0.09;
-      const img = ctx.createImageData(W, H), o = img.data;
-      for (let y = 0, i = 0; y < H; y++) {
-        for (let x = 0; x < W; x++, i++) {
-          const u = (x + 0.5) / W, v = (y + 0.5) / H;
-
-          // cushions: rounded Voronoi lumps on strongly warped coordinates, plus a second, smaller scale
-          const cellR = Math.min(W / clx, H / cly) * 0.5;
-          U.voro(u * clx + warpX[i] * 1.6, v * cly + warpY[i] * 1.6, clx, cly, seed + 1, 1, false, W / clx, H / cly, cellR * 0.35, V);
-          const t1 = clamp(V.es / (cellR * 0.7)), clumpId = V.id;
-          // secondary lumps: plain Worley F2 − F1 is close enough here and much cheaper than exact borders
-          const w2 = U.worley(u * c2x + warpY[i] * 2.2, v * c2y + warpX[i] * 2.2, c2x, c2y, seed + 2);
-          const t2 = clamp((w2.f2 - w2.f1) * 1.6);
-          const d1 = Math.sqrt(1 - (1 - t1) * (1 - t1)), d2 = Math.sqrt(1 - (1 - t2) * (1 - t2));
-          const cvis = 0.35 + 0.65 * smoothstep(0.3, 0.7, crevF[i]);
-          const dome = clamp(1 - (1 - d1) * cvis * 0.85 - (1 - d2) * 0.35);
-
-          // leafy micro-structure: tiny tips (worley blobs) and their dark gaps, plus fine strands
-          let tipM = 0, gapM = 0, fib = 0.5;
-          if (p.fibers > 0) {
-            const w = U.worley(u * fbx, v * fby, fbx, fby, seed + 5);
-            tipM = (1 - smoothstep(0.05, 0.5, w.f1)) * (0.6 + 0.4 * w.id);
-            gapM = 1 - smoothstep(0, 0.1, w.f2 - w.f1);
-            fib = U.fractal('perlin', u * hfx, v * hfy, hfx, hfy, 2, 0.5, 'ridged', seed + 6);
+      /* 2. fronds: star-shaped sprigs on a jittered grid, splatted with a z-buffer (highest wins) */
+      const Hb = new Float32Array(N), Tb = new Float32Array(N), Ib = new Float32Array(N), Db = new Uint8Array(N);
+      const gapDepth = 0.075;
+      for (let i = 0; i < N; i++) { Hb[i] = surf[i] - gapDepth; Ib[i] = -1; }
+      const cw = W / fnx, ch = H / fny, R0 = Math.min(cw, ch) * 1.05;
+      const wPx = Math.max(0.5, R0 * 0.06 * p.thickness); // strand half width, px
+      const reach = Math.ceil(wPx + 0.5), step = Math.max(0.5, wPx * 0.85);
+      const strandDrop = 0.012; // a strand is rounded: its edge sits a little lower than its middle
+      const put = (fx, fy, h, t, id, dead) => {
+        const x0 = Math.floor(fx - reach), y0 = Math.floor(fy - reach), x1 = Math.ceil(fx + reach), y1 = Math.ceil(fy + reach);
+        const w2 = (wPx + 0.35) * (wPx + 0.35);
+        for (let y = y0; y <= y1; y++) {
+          const dy = y + 0.5 - fy, row = (y < 0 ? y + H : y >= H ? y - H : y) * W;
+          for (let x = x0; x <= x1; x++) {
+            const dx = x + 0.5 - fx, d2 = dx * dx + dy * dy;
+            if (d2 > w2) continue;
+            const k = row + (x < 0 ? x + W : x >= W ? x - W : x), hh = h - (d2 / w2) * strandDrop;
+            if (hh > Hb[k]) { Hb[k] = hh; Tb[k] = t; Ib[k] = id; Db[k] = dead; }
           }
-          const fd = p.fibers;
-
-          // coverage with tufted edges
-          const cv0 = patch[i] + (tipM - 0.35) * 0.22 * (0.4 + p.edgeSoft) * fd + (dome - 0.5) * 0.12;
-          const cov = smoothstep(th - soft, th + soft, cv0);
-          const near = smoothstep(th - soft - 0.12, th - soft, cv0); // around the moss: contact shadow
-
-          // moss color
-          let sh = dome * 0.7 + (fib - 0.5) * 0.4 * fd + (clumpId - 0.5) * p.colorVar * 0.5;
-          sh = clamp(sh);
-          let r = lerp(dark[0], mid[0], sh), g = lerp(dark[1], mid[1], sh), b = lerp(dark[2], mid[2], sh);
-          const tipK = clamp(tipM * fd * p.tipAmt * (0.35 + 0.65 * dome) * 1.4);
-          let dr = 0;
-          if (dryF) { dr = smoothstep(0.5, 0.78, dryF[i] + (clumpId - 0.5) * 0.25) * p.dryAmt; dr = clamp(dr + tipK * dr * 0.6); }
-          r = lerp(r, tip[0], tipK); g = lerp(g, tip[1], tipK); b = lerp(b, tip[2], tipK);
-          r = lerp(r, dry[0] * (0.6 + 0.5 * sh), dr); g = lerp(g, dry[1] * (0.6 + 0.5 * sh), dr); b = lerp(b, dry[2] * (0.6 + 0.5 * sh), dr);
-          const crev = 1 - p.clumpDepth * (1 - dome) * 0.75 - gapM * 0.3 * fd;
-          r *= crev; g *= crev; b *= crev;
-          let mh = 0.4 + dome * 0.4 + (tipM - 0.4) * 0.12 * fd + (fib - 0.5) * 0.06 * fd;
-
-          // spore capsules (sporophytes), only on the moss
-          if (p.spores > 0) {
-            const w = U.worley(u * spx, v * spy, spx, spy, seed + 13);
-            if (w.id < p.spores * 0.6) {
-              const rr = 0.09 + w.id * 0.05, d = w.f1;
-              const cap = 1 - smoothstep(rr * 0.7, rr, d);
-              if (cap > 0) {
-                const hl = 1 - smoothstep(0, rr * 0.6, Math.hypot(d - rr * 0.25, 0));
-                r = lerp(r, spc[0] * (0.75 + 0.4 * hl), cap); g = lerp(g, spc[1] * (0.75 + 0.4 * hl), cap); b = lerp(b, spc[2] * (0.75 + 0.4 * hl), cap);
-                mh = Math.max(mh, mh + cap * 0.1);
-              }
-            }
-          }
-
-          // ground
-          let gr = g1[0], gg = g1[1], gb = g1[2], gh = 0.15;
-          if (groundF) {
-            let gt = groundF[i];
-            if (p.ground === 'bark') {
-              const lines = U.fractal('perlin', u * grx * 3, v * bly, grx * 3, bly, 3, 0.5, 'ridged', seed + 15);
-              gt = clamp(gt * 0.4 + lines * 0.7 - 0.1);
-            } else if (p.ground === 'soil') {
-              const w = U.worley(u * grx * 6, v * gry * 6, grx * 6, gry * 6, seed + 17);
-              const peb = (1 - smoothstep(0.25, 0.32, w.f1)) * (w.id > 0.55 ? 1 : 0);
-              gt = clamp(gt + peb * 0.4);
-            } else {
-              gt = clamp(gt + (U.hash(x, y, seed + 19) - 0.5) * 0.12);
-            }
-            gr = lerp(g2[0], g1[0], gt); gg = lerp(g2[1], g1[1], gt); gb = lerp(g2[2], g1[2], gt);
-            gh = gt * 0.3;
-          }
-          const ao = 1 - near * (1 - cov) * p.shadow * 0.55;
-          gr *= ao; gg *= ao; gb *= ao;
-
-          const k = i * 4;
-          if (height) { const hv = lerp(gh, mh, cov); o[k] = o[k + 1] = o[k + 2] = clamp(hv) * 255; o[k + 3] = 255; continue; }
-          if (p.output === 'mask') { o[k] = o[k + 1] = o[k + 2] = cov * 255; o[k + 3] = 255; continue; }
-          if (p.output === 'overlay') { o[k] = r; o[k + 1] = g; o[k + 2] = b; o[k + 3] = cov * 255; continue; }
-          o[k] = lerp(gr, r, cov); o[k + 1] = lerp(gg, g, cov); o[k + 2] = lerp(gb, b, cov); o[k + 3] = 255;
         }
+      };
+      // one arm from (x, y) at angle a, length L, height h0 at the base sloping down by drop
+      const arm = (x, y, a, L, h0, drop, curl, id, dead, t0, side, rnd) => {
+        const n = Math.max(2, Math.ceil(L / step));
+        let px = x, py = y, ang = a;
+        for (let s = 1; s <= n; s++) {
+          const t = s / n;
+          ang += curl / n;
+          px += Math.cos(ang) * (L / n); py += Math.sin(ang) * (L / n);
+          const tt = t0 + (1 - t0) * t;
+          put(px, py, h0 - drop * t * t, tt, id, dead);
+          // feathery side leaflets, alternating, shorter toward the tip (skipped when below ~1.5 px)
+          if (side && s % 2 === 0 && t < 0.85) {
+            const sl = L * 0.32 * (1 - t) * (0.6 + 0.4 * rnd());
+            if (sl < 1.5) continue;
+            const sa = ang + (s % 4 === 0 ? 1 : -1) * (0.9 + 0.3 * rnd());
+            arm(px, py, sa, sl, h0 - drop * t * t - 0.004, drop * 0.5, curl * 0.3, id, dead, tt, false, rnd);
+          }
+        }
+      };
+      const dens = p.density, fluff = p.fluff;
+      for (let j = 0; j < fny; j++) {
+        for (let i = 0; i < fnx; i++) {
+          const rnd = U.rng(seed * 7919 + j * 104729 + i * 15485863 + 11);
+          const cnt = Math.floor(dens) + (rnd() < dens - Math.floor(dens) ? 1 : 0);
+          for (let c = 0; c < cnt; c++) {
+            const cx = (i + rnd()) * cw, cy = (j + rnd()) * ch;
+            const k0 = U.mod(Math.round(cy), H) * W + U.mod(Math.round(cx), W);
+            const id = rnd(), dead = rnd() < p.dead * 0.35 ? 1 : 0;
+            const R = R0 * (0.65 + 0.55 * rnd()) * (dead ? 0.8 : 1);
+            // apex: on the surface, some fronds stick out, some sit lower in the canopy
+            const apex = surf[k0] + (rnd() - 0.35) * 0.05 - dead * 0.03; // dead fronds sit lower, half covered
+            const drop = 0.03 + 0.02 * fluff;
+            const na = Math.max(3, p.arms + Math.round((rnd() - 0.5) * 2)), rot = rnd() * Math.PI * 2;
+            put(cx, cy, apex + 0.004, 0, id, dead); // the stem top
+            for (let a = 0; a < na; a++) {
+              const ang = rot + (a / na) * Math.PI * 2 + (rnd() - 0.5) * 0.6;
+              const L = R * (0.55 + 0.45 * rnd());
+              const curl = (rnd() - 0.5) * 2.4 * fluff;
+              arm(cx, cy, ang, L, apex, drop, curl, id, dead, 0.15, fluff > 0.05 && rnd() < 0.35 + fluff * 0.65, rnd);
+            }
+          }
+        }
+      }
+
+      /* 3. ambient occlusion from the height buffer: tight (frond scale) + broad (cushion scale) */
+      const occl = new Float32Array(N);
+      {
+        const b1 = Float32Array.from(Hb), b2 = Float32Array.from(Hb);
+        blurWrap(b1, W, H, Math.max(1, Math.round(R0 * 0.45)));
+        blurWrap(b1, W, H, Math.max(1, Math.round(R0 * 0.45)));
+        blurWrap(b2, W, H, Math.max(1, Math.round(cellR * (0.15 + p.aoSize * 0.35))));
+        blurWrap(b2, W, H, Math.max(1, Math.round(cellR * (0.15 + p.aoSize * 0.35))));
+        for (let i = 0; i < N; i++) {
+          const a1 = clamp((b1[i] - Hb[i]) / (gapDepth * 0.8)), a2 = clamp((b2[i] - Hb[i]) / (0.05 + 0.12 * p.cushionHeight));
+          occl[i] = clamp(a1 * (1 - p.aoSize * 0.3) + a2 * (0.25 + p.aoSize));
+        }
+      }
+
+      const img = ctx.createImageData(W, H), o = img.data;
+      if (heightOut) {
+        let lo = Infinity, hi = -Infinity;
+        for (let i = 0; i < N; i++) { if (Hb[i] < lo) lo = Hb[i]; if (Hb[i] > hi) hi = Hb[i]; }
+        const k = hi > lo ? 255 / (hi - lo) : 0;
+        for (let i = 0; i < N; i++) { const g = (Hb[i] - lo) * k; o[i * 4] = o[i * 4 + 1] = o[i * 4 + 2] = g; o[i * 4 + 3] = 255; }
+        ctx.putImageData(img, 0, 0);
+        return;
+      }
+      if (tipsOut) { // leaf tips high in the canopy (live fronds only): the source for smoothness / metallic
+        for (let i = 0; i < N; i++) { const top = clamp(1 - occl[i] * 1.4), g = Ib[i] < 0 || Db[i] ? 0 : smoothstep(0.3, 1, Tb[i]) * top * top * 255; o[i * 4] = o[i * 4 + 1] = o[i * 4 + 2] = g; o[i * 4 + 3] = 255; }
+        ctx.putImageData(img, 0, 0);
+        return;
+      }
+      if (p.output === 'aomap') {
+        for (let i = 0; i < N; i++) { const g = (1 - occl[i] * Math.max(0.05, p.ao)) * 255; o[i * 4] = o[i * 4 + 1] = o[i * 4 + 2] = g; o[i * 4 + 3] = 255; }
+        ctx.putImageData(img, 0, 0);
+        return;
+      }
+
+      /* 4. color */
+      const dark = U.hex(p.dark), mid = U.hex(p.mid), tip = U.hex(p.tip), dry = U.hex(p.dry), dc = U.hex(p.deadColor);
+      const glow = tip.map((c) => c + (255 - c) * 0.45); // sheen: the tip color, paler
+      const varF = U.coarseField(W, H, 128, (x, y) => U.fractal('perlin', (x / W) * vpx, (y / H) * vpy, vpx, vpy, 4, 0.55, 'fbm', seed + 9));
+      const dryF = p.dryAmt > 0 ? U.coarseField(W, H, 128, (x, y) => U.fractal('perlin', (x / W) * dxp, (y / H) * dyp, dxp, dyp, 4, 0.5, 'fbm', seed + 7)) : null;
+      const aoK = p.output === 'albedo' ? 0 : p.ao;
+      for (let i = 0; i < N; i++) {
+        const k = i * 4, id = Ib[i], t = Tb[i];
+        // how high in the canopy: tips on top of the cushions catch the most light
+        const top = clamp(1 - occl[i] * 1.4);
+        let r, g, b;
+        if (id < 0) { // gap between fronds: the dark depth
+          r = dark[0] * 0.8; g = dark[1] * 0.8; b = dark[2] * 0.8;
+        } else {
+          const vf = (varF[i] - 0.5) * 2 * p.colorVar, fv = (id - 0.5) * p.colorVar;
+          // body: depth → mid along the frond, brighter higher up
+          const body = clamp(0.1 + 0.6 * t + 0.4 * top + fv * 0.5);
+          r = lerp(dark[0], mid[0], body); g = lerp(dark[1], mid[1], body); b = lerp(dark[2], mid[2], body);
+          // broad patches lean toward the tip color (yellow-green) or the depth color
+          if (vf > 0) { r = lerp(r, tip[0], vf * 0.35); g = lerp(g, tip[1], vf * 0.35); b = lerp(b, tip[2], vf * 0.35); } else { r = lerp(r, dark[0], -vf * 0.3); g = lerp(g, dark[1], -vf * 0.3); b = lerp(b, dark[2], -vf * 0.3); }
+          const tk = clamp(p.tipAmt * smoothstep(0.35, 1, t) * (0.45 + 0.55 * top) * (1 + fv));
+          r = lerp(r, tip[0], tk); g = lerp(g, tip[1], tk); b = lerp(b, tip[2], tk);
+          if (dryF) {
+            const dr = smoothstep(0.5, 0.78, dryF[i] + (id - 0.5) * 0.2) * p.dryAmt;
+            r = lerp(r, dry[0] * (0.75 + 0.35 * t), dr); g = lerp(g, dry[1] * (0.75 + 0.35 * t), dr); b = lerp(b, dry[2] * (0.75 + 0.35 * t), dr);
+          }
+          if (Db[i]) { const s = 0.55 + 0.5 * t; r = lerp(r, dc[0] * s, 0.8); g = lerp(g, dc[1] * s, 0.8); b = lerp(b, dc[2] * s, 0.8); }
+          // fuzz sheen: soft glow on the uppermost tips, no light direction
+          const sh = Db[i] ? 0 : p.sheen * smoothstep(0.45, 1, t) * top * top * 0.6;
+          r = lerp(r, glow[0], sh); g = lerp(g, glow[1], sh); b = lerp(b, glow[2], sh);
+        }
+        const ao = 1 - occl[i] * aoK * 0.85;
+        o[k] = r * ao; o[k + 1] = g * ao; o[k + 2] = b * ao; o[k + 3] = 255;
       }
       ctx.putImageData(img, 0, 0);
     },

@@ -12,7 +12,7 @@
   };
   U.getGen = (id) => U.generators.find((g) => g.id === id);
   // filter tags, in display order; each generator lists up to 3 of them in `tags`
-  U.TAGS = ['Horror', 'Texturing', 'UI', 'Shooter', 'Military', 'VFX', 'Lighting', 'Nature', 'Decals', 'Vehicles', 'Sci-fi'];
+  U.TAGS = ['Horror', 'PBR', 'Texturing', 'UI', 'Shooter', 'Military', 'VFX', 'Lighting', 'Nature', 'Decals', 'Vehicles', 'Sci-fi'];
 
   /* ---------- math ---------- */
   const clamp = (v, a = 0, b = 1) => (v < a ? a : v > b ? b : v);
@@ -36,11 +36,17 @@
     };
   };
 
-  function hash(x, y, s) {
-    let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1) ^ Math.imul(s | 0, 0x9e3779b1);
+  /* The hash is split into its three multiplied inputs so the noise functions below can compute the x / y /
+     seed terms once per lattice row or column instead of once per corner (h(x, y, s) = mix(X(x) ^ Y(y) ^ S(s))).
+     Results are bit-identical to the plain hash. */
+  const HX = 0x27d4eb2d, HY = 0x165667b1, HS = 0x9e3779b1, INV32 = 1 / 4294967296;
+  const mix = (h) => {
     h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
     h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
-    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+    return (h ^ (h >>> 16)) >>> 0;
+  };
+  function hash(x, y, s) {
+    return mix(Math.imul(x | 0, HX) ^ Math.imul(y | 0, HY) ^ Math.imul(s | 0, HS)) / 4294967296;
   }
   U.hash = hash;
 
@@ -49,62 +55,85 @@
      Integer periods make the result tile seamlessly over [0, period). */
   const wrap = (i, p) => (p > 0 ? ((i % p) + p) % p : i);
   const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+  // wrapped lattice index pair (i, i + 1) for the hot paths; integer periods take the exact shortcut
+  // (same result as wrap()), fractional ones use wrap() itself so rounding stays identical
+  const W2 = [0, 0];
+  const wrap2 = (i, p) => {
+    if (p > 0) {
+      if ((p | 0) === p) {
+        let a = i % p; if (a < 0) a += p;
+        const b = a + 1;
+        W2[0] = a; W2[1] = b === p ? 0 : b;
+      } else { W2[0] = wrap(i, p); W2[1] = wrap(i + 1, p); }
+    } else { W2[0] = i; W2[1] = i + 1; }
+    return W2;
+  };
 
   U.value = function (x, y, px, py, s) {
     const x0 = Math.floor(x), y0 = Math.floor(y);
     const fx = x - x0, fy = y - y0, ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
-    const xa = wrap(x0, px), xb = wrap(x0 + 1, px), ya = wrap(y0, py), yb = wrap(y0 + 1, py);
-    const v = lerp(lerp(hash(xa, ya, s), hash(xb, ya, s), ux), lerp(hash(xa, yb, s), hash(xb, yb, s), ux), uy);
+    let w = wrap2(x0, px);
+    const xa = Math.imul(w[0] | 0, HX), xb = Math.imul(w[1] | 0, HX);
+    w = wrap2(y0, py);
+    const ss = Math.imul(s | 0, HS), ya = Math.imul(w[0] | 0, HY) ^ ss, yb = Math.imul(w[1] | 0, HY) ^ ss;
+    const v = lerp(lerp(mix(xa ^ ya) * INV32, mix(xb ^ ya) * INV32, ux), lerp(mix(xa ^ yb) * INV32, mix(xb ^ yb) * INV32, ux), uy);
     return v * 2 - 1;
   };
 
   const GX = [1, -1, 0, 0, 0.7071, -0.7071, 0.7071, -0.7071];
   const GY = [0, 0, 1, -1, 0.7071, 0.7071, -0.7071, -0.7071];
-  const grad = (ix, iy, s, dx, dy) => {
-    const g = (hash(ix, iy, s) * 8) | 0;
-    return GX[g] * dx + GY[g] * dy;
-  };
-  U.perlin = function (x, y, px, py, s) {
+  // gradient index = top 3 bits of the hash (== (hash() * 8) | 0)
+  const grad = (h, dx, dy) => { const g = h >>> 29; return GX[g] * dx + GY[g] * dy; };
+  const perlin = function (x, y, px, py, s) {
     const x0 = Math.floor(x), y0 = Math.floor(y);
     const fx = x - x0, fy = y - y0, ux = fade(fx), uy = fade(fy);
-    const xa = wrap(x0, px), xb = wrap(x0 + 1, px), ya = wrap(y0, py), yb = wrap(y0 + 1, py);
-    const n00 = grad(xa, ya, s, fx, fy), n10 = grad(xb, ya, s, fx - 1, fy);
-    const n01 = grad(xa, yb, s, fx, fy - 1), n11 = grad(xb, yb, s, fx - 1, fy - 1);
+    let w = wrap2(x0, px);
+    const xa = Math.imul(w[0] | 0, HX), xb = Math.imul(w[1] | 0, HX);
+    w = wrap2(y0, py);
+    const ss = Math.imul(s | 0, HS), ya = Math.imul(w[0] | 0, HY) ^ ss, yb = Math.imul(w[1] | 0, HY) ^ ss;
+    const n00 = grad(mix(xa ^ ya), fx, fy), n10 = grad(mix(xb ^ ya), fx - 1, fy);
+    const n01 = grad(mix(xa ^ yb), fx, fy - 1), n11 = grad(mix(xb ^ yb), fx - 1, fy - 1);
     return lerp(lerp(n00, n10, ux), lerp(n01, n11, ux), uy) * 1.4142;
   };
+  U.perlin = perlin;
 
   const WOUT = { f1: 0, f2: 0, id: 0 };
-  U.worley = function (x, y, px, py, s) {
+  const worley = function (x, y, px, py, s) {
     const xi = Math.floor(x), yi = Math.floor(y);
+    const s0 = Math.imul(s | 0, HS), s1 = Math.imul((s + 7919) | 0, HS), s2 = Math.imul((s + 104729) | 0, HS);
     let f1 = 1e9, f2 = 1e9, id = 0;
     for (let j = -1; j <= 1; j++) {
+      const cy = yi + j, hy = Math.imul(wrap(cy, py) | 0, HY);
       for (let i = -1; i <= 1; i++) {
-        const cx = xi + i, cy = yi + j, wx = wrap(cx, px), wy = wrap(cy, py);
-        const dx = cx + hash(wx, wy, s) - x, dy = cy + hash(wx, wy, s + 7919) - y;
+        const cx = xi + i, hxy = Math.imul(wrap(cx, px) | 0, HX) ^ hy;
+        const dx = cx + mix(hxy ^ s0) / 4294967296 - x, dy = cy + mix(hxy ^ s1) / 4294967296 - y;
         const d = dx * dx + dy * dy;
-        if (d < f1) { f2 = f1; f1 = d; id = hash(wx, wy, s + 104729); }
+        if (d < f1) { f2 = f1; f1 = d; id = mix(hxy ^ s2) / 4294967296; }
         else if (d < f2) f2 = d;
       }
     }
     WOUT.f1 = Math.sqrt(f1); WOUT.f2 = Math.sqrt(f2); WOUT.id = id;
     return WOUT;
   };
+  U.worley = worley;
 
   const BASIS = {
-    perlin: U.perlin,
+    perlin,
     value: U.value,
-    worley: (x, y, px, py, s) => U.worley(x, y, px, py, s).f1 * 2 - 1,
-    cells: (x, y, px, py, s) => { const w = U.worley(x, y, px, py, s); return (w.f2 - w.f1) * 2 - 1; },
+    worley: (x, y, px, py, s) => worley(x, y, px, py, s).f1 * 2 - 1,
+    cells: (x, y, px, py, s) => { const w = worley(x, y, px, py, s); return (w.f2 - w.f1) * 2 - 1; },
   };
 
   /* Fractal sum, lacunarity fixed at 2 so integer periods stay integer (= tileable). Returns 0..1 */
   U.fractal = function (basis, x, y, px, py, octaves, gain, mode, seed) {
-    const fn = BASIS[basis] || U.perlin;
+    const fn = BASIS[basis] || perlin, isP = fn === perlin;
+    const ridged = mode === 'ridged', turb = mode === 'turbulence';
     let amp = 1, sum = 0, norm = 0, f = 1;
     for (let o = 0; o < octaves; o++) {
-      let n = fn(x * f, y * f, px * f, py * f, seed + o * 1013);
-      if (mode === 'ridged') { n = 1 - Math.abs(n); n = n * n * 2 - 1; }
-      else if (mode === 'turbulence') n = Math.abs(n) * 2 - 1;
+      // direct call for perlin (the common basis) keeps this call site monomorphic and inlinable
+      let n = isP ? perlin(x * f, y * f, px * f, py * f, seed + o * 1013) : fn(x * f, y * f, px * f, py * f, seed + o * 1013);
+      if (ridged) { n = 1 - Math.abs(n); n = n * n * 2 - 1; }
+      else if (turb) n = Math.abs(n) * 2 - 1;
       sum += n * amp; norm += amp; amp *= gain; f *= 2;
     }
     return clamp((sum / norm) * 0.5 + 0.5);
@@ -208,17 +237,20 @@
     }
     const br = Math.max(1, Math.round(r / 1.73)); // 3 box passes of radius br ≈ gaussian with sigma ≈ r / 2
     const ix = (i, n) => (wrap ? ((i % n) + n) % n : i < 0 ? 0 : i >= n ? n - 1 : i);
+    // all four channels in one sweep (one pass over memory instead of four); per channel the sums run in the
+    // same order as a channel-by-channel loop, so the result is identical
     const pass = (s, d, len, lines, step, lineStep) => {
-      const inv = 1 / (2 * br + 1);
+      const inv = 1 / (2 * br + 1), st = step * 4;
       for (let l = 0; l < lines; l++) {
-        const o = l * lineStep * 4, st = step * 4;
-        for (let c = 0; c < 4; c++) {
-          let sum = 0;
-          for (let k = -br; k <= br; k++) sum += s[o + ix(k, len) * st + c];
-          for (let i = 0; i < len; i++) {
-            d[o + i * st + c] = sum * inv;
-            sum += s[o + ix(i + br + 1, len) * st + c] - s[o + ix(i - br, len) * st + c];
-          }
+        const o = l * lineStep * 4;
+        let s0 = 0, s1 = 0, s2 = 0, s3 = 0;
+        for (let k = -br; k <= br; k++) { const q = o + ix(k, len) * st; s0 += s[q]; s1 += s[q + 1]; s2 += s[q + 2]; s3 += s[q + 3]; }
+        for (let i = 0; i < len; i++) {
+          const q = o + i * st;
+          d[q] = s0 * inv; d[q + 1] = s1 * inv; d[q + 2] = s2 * inv; d[q + 3] = s3 * inv;
+          const ia = i + br + 1, ib = i - br;
+          const a = o + (ia < len ? ia : ix(ia, len)) * st, b = o + (ib >= 0 ? ib : ix(ib, len)) * st;
+          s0 += s[a] - s[b]; s1 += s[a + 1] - s[b + 1]; s2 += s[a + 2] - s[b + 2]; s3 += s[a + 3] - s[b + 3];
         }
       }
     };
@@ -235,10 +267,17 @@
        ci, cj = wrapped cell index, es = smooth-min border distance (rounded corners) when k > 0 */
   // feature point offsets per lattice cell, cached per (nx, ny, seed, jit, stag)
   const voroTables = new Map();
+  // U.voro is called per pixel with the same one or two lattices (e.g. cobbles + filler pebbles): the two
+  // most recent tables are checked first, without building a key
+  let voroLast = null, voroPrev = null;
+  const voroHit = (L, nx, ny, seed, jit, sg) => L && L.nx === nx && L.ny === ny && L.seed === seed && L.jit === jit && L.stag === sg;
   function voroTable(nx, ny, seed, jit, stag) {
-    const key = nx + ',' + ny + ',' + seed + ',' + jit + ',' + (stag ? 1 : 0);
+    const sg = stag ? 1 : 0;
+    if (voroHit(voroLast, nx, ny, seed, jit, sg)) return voroLast.t;
+    if (voroHit(voroPrev, nx, ny, seed, jit, sg)) { const L = voroPrev; voroPrev = voroLast; voroLast = L; return L.t; }
+    const key = nx + ',' + ny + ',' + seed + ',' + jit + ',' + sg;
     let t = voroTables.get(key);
-    if (t) return t;
+    if (t) { voroPrev = voroLast; voroLast = { nx, ny, seed, jit, stag: sg, t }; return t; }
     if (voroTables.size > 24) voroTables.clear();
     t = { ox: new Float32Array(nx * ny), oy: new Float32Array(nx * ny), id: new Float32Array(nx * ny) };
     for (let j = 0, n = 0; j < ny; j++) for (let i = 0; i < nx; i++, n++) {
@@ -247,40 +286,41 @@
       t.id[n] = hash(i, j, seed + 104729);
     }
     voroTables.set(key, t);
+    voroPrev = voroLast;
+    voroLast = { nx, ny, seed, jit, stag: sg, t };
     return t;
   }
 
+  const VDS = new Float64Array(32);
   U.voro = function (X, Y, nx, ny, seed, jit, stag, sx, sy, k, out) {
     const T = voroTable(nx, ny, seed, jit, stag), OX = T.ox, OY = T.oy;
-    const P = U._vp || (U._vp = { x: 0, y: 0, wi: 0, wj: 0 });
-    const pt = (i, j, o) => {
-      let wi = i % nx; if (wi < 0) wi += nx;
-      let wj = j % ny; if (wj < 0) wj += ny;
-      const n = wj * nx + wi;
-      o.x = i + OX[n]; o.y = j + OY[n]; o.wi = wi; o.wj = wj;
-      return o;
-    };
     const xi = Math.floor(X), yi = Math.floor(Y);
     let best = 1e18, ax = 0, ay = 0, bi = 0, bj = 0, bwi = 0, bwj = 0;
     for (let j = yi - 1; j <= yi + 1; j++) {
+      let wj = j % ny; if (wj < 0) wj += ny;
+      const row = wj * nx;
       for (let i = xi - (stag ? 2 : 1); i <= xi + 1; i++) {
-        pt(i, j, P);
-        const dx = (P.x - X) * sx, dy = (P.y - Y) * sy, d = dx * dx + dy * dy;
-        if (d < best) { best = d; ax = P.x; ay = P.y; bi = i; bj = j; bwi = P.wi; bwj = P.wj; }
+        let wi = i % nx; if (wi < 0) wi += nx;
+        const n = row + wi, PX = i + OX[n], PY = j + OY[n];
+        const dx = (PX - X) * sx, dy = (PY - Y) * sy, d = dx * dx + dy * dy;
+        if (d < best) { best = d; ax = PX; ay = PY; bi = i; bj = j; bwi = wi; bwj = wj; }
       }
     }
     // second pass: distance to the bisector with every neighbour point (exact cell border distance)
     let e = 1e9, es = 0;
     const kk = k > 0 ? k : 0, lim = kk * 6;
-    const ds = U._vds || (U._vds = new Float64Array(32));
+    const ds = VDS;
     let nd = 0;
     for (let j = bj - 2; j <= bj + 2; j++) {
+      let wj = j % ny; if (wj < 0) wj += ny;
+      const row = wj * nx;
       for (let i = bi - 2; i <= bi + 2; i++) {
         if (i === bi && j === bj) continue;
-        pt(i, j, P);
-        const ux = (P.x - ax) * sx, uy = (P.y - ay) * sy, l = Math.sqrt(ux * ux + uy * uy);
+        let wi = i % nx; if (wi < 0) wi += nx;
+        const n = row + wi, PX = i + OX[n], PY = j + OY[n];
+        const ux = (PX - ax) * sx, uy = (PY - ay) * sy, l = Math.sqrt(ux * ux + uy * uy);
         if (l < 1e-9) continue;
-        const mx = ((ax + P.x) * 0.5 - X) * sx, my = ((ay + P.y) * 0.5 - Y) * sy;
+        const mx = ((ax + PX) * 0.5 - X) * sx, my = ((ay + PY) * 0.5 - Y) * sy;
         const d = (mx * ux + my * uy) / l;
         if (d < e) e = d;
         if (kk && nd < 32) ds[nd++] = d;

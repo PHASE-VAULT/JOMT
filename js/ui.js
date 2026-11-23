@@ -1,6 +1,8 @@
 /* UGTG param UI: builds controls from a generator's param definitions.
-   Param def: { key, label, type: range|int|color|select|bool|seed|text|list|section, default, min, max, step,
-                options, show(values, root), apply(value, values), collapsed, item (list), tip } */
+   Param def: { key, label, type: range|int|span|color|select|bool|seed|text|list|section, default, min, max, step,
+                options, show(values, root), apply(value, values), collapsed, item (list), tip }
+   span: one min … max range slider with two handles that writes two values: `key` (low end, `default`) and
+         `key2` (high end, `default2`). `cross: true` lets the handles pass each other (e.g. an inverting remap). */
 (function () {
   'use strict';
   const U = window.UGTG;
@@ -17,7 +19,10 @@
   U.clone = clone;
   U.defaultsFor = (defs) => {
     const o = {};
-    for (const d of defs) if (d.key) o[d.key] = clone(d.default);
+    for (const d of defs) {
+      if (d.key) o[d.key] = clone(d.default);
+      if (d.key2) o[d.key2] = clone(d.default2);
+    }
     return o;
   };
 
@@ -27,9 +32,11 @@
   U.presetValues = (gen, preset) => {
     const v = U.defaultsFor(gen.params), pv = preset.values || {};
     const byKey = new Map(gen.params.filter((d) => d.key).map((d) => [d.key, d]));
+    for (const d of gen.params) if (d.key2) byKey.set(d.key2, d);
     for (const k of Object.keys(pv)) if (!byKey.has(k)) console.warn(`preset "${preset.name}" (${gen.id}): unknown param "${k}"`);
     for (const d of gen.params) if (d.apply && d.key in pv) { v[d.key] = clone(pv[d.key]); d.apply(v[d.key], v); }
     for (const d of gen.params) {
+      if (d.key2 && d.key2 in pv) v[d.key2] = clone(pv[d.key2]);
       if (!d.key || !(d.key in pv) || d.apply) continue;
       const x = clone(pv[d.key]);
       // list items only need the fields that differ from the item defaults
@@ -54,7 +61,8 @@
       case 'text': return !!v;
       case 'select': return !(v === 'none' && optList(d.options).some(([o]) => o === 'none'));
       case 'range':
-      case 'int': return !(d.min <= 0 && +v === 0);
+      case 'int': return d.neutral !== undefined ? +v !== d.neutral : !(d.min <= 0 && +v === 0);
+      case 'span':
       case 'color': return true;
       case 'list': return Array.isArray(v) && v.some((it) => it.on !== false);
       default: return false;
@@ -172,21 +180,22 @@
     switch (d.type) {
       case 'range':
       case 'int': {
+        // optional d.fmt(v) -> text / d.parse(text) -> number: a text field instead of a number field (e.g. "All")
         const step = d.type === 'int' ? 1 : d.step || 0.01, dec = decimals(step);
         const head = el('div', 'ctl-head');
         const num = el('input', 'num');
-        num.type = 'number'; num.step = step;
+        if (d.fmt) { num.type = 'text'; num.inputMode = 'decimal'; num.onfocus = () => num.select(); } else { num.type = 'number'; num.step = step; }
         const sl = el('input', 'slider');
         sl.type = 'range'; sl.min = d.min; sl.max = d.max; sl.step = step;
         const paint = (v) => {
           sl.value = v;
-          num.value = (+v).toFixed(dec);
+          num.value = d.fmt ? d.fmt(+v) : (+v).toFixed(dec);
           sl.style.setProperty('--p', U.clamp((v - d.min) / (d.max - d.min)) * 100 + '%');
         };
         paint(values[d.key]);
         sl.oninput = () => { const v = +sl.value; paint(v); commit(v); };
         num.onchange = () => {
-          let v = parseFloat(num.value);
+          let v = d.parse ? d.parse(num.value) : parseFloat(num.value);
           if (!isFinite(v)) v = d.default;
           v = U.clamp(v, d.min, d.max);
           if (d.type === 'int') v = Math.round(v);
@@ -196,6 +205,52 @@
         sl.title = U.t('Double-click to reset');
         head.append(label, num);
         row.append(head, sl);
+        break;
+      }
+      case 'span': {
+        // two range inputs stacked on one track; only their thumbs take the pointer (see .span-wrap in the CSS)
+        const step = d.step || 0.01, dec = decimals(step), k2 = d.key2;
+        const head = el('div', 'ctl-head'), nums = el('div', 'span-nums');
+        const mkNum = () => { const n = el('input', 'num'); n.type = 'number'; n.step = step; return n; };
+        const nLo = mkNum(), nHi = mkNum();
+        nums.append(nLo, el('span', 'span-dash', '–'), nHi);
+        const wrap = el('div', 'span-wrap');
+        const mkSl = () => { const s = el('input', 'slider span-sl'); s.type = 'range'; s.min = d.min; s.max = d.max; s.step = step; return s; };
+        const sLo = mkSl(), sHi = mkSl();
+        wrap.append(sLo, sHi);
+        const pct = (v) => U.clamp((v - d.min) / (d.max - d.min)) * 100 + '%';
+        const paint = () => {
+          const a = values[d.key], b = values[k2];
+          sLo.value = a; sHi.value = b;
+          nLo.value = (+a).toFixed(dec); nHi.value = (+b).toFixed(dec);
+          wrap.style.setProperty('--a', pct(Math.min(a, b)));
+          wrap.style.setProperty('--b', pct(Math.max(a, b)));
+        };
+        // setting one end: without `cross` the other end is pushed along so low ≤ high
+        const set = (which, v) => {
+          if (which === 0) { values[d.key] = v; if (!d.cross && v > values[k2]) values[k2] = v; } else { values[k2] = v; if (!d.cross && v < values[d.key]) values[d.key] = v; }
+          paint();
+          hooks.change(false);
+        };
+        sLo.oninput = () => set(0, +sLo.value);
+        sHi.oninput = () => set(1, +sHi.value);
+        // when both thumbs sit on the same spot, the one that can still move toward the pointer takes it
+        wrap.addEventListener('pointerdown', () => {
+          const lo = +sLo.value, hi = +sHi.value;
+          sLo.style.zIndex = lo === hi && lo >= d.max - (d.max - d.min) * 0.02 ? 3 : 1;
+        }, true);
+        const numSet = (which, n) => {
+          let v = parseFloat(n.value);
+          if (!isFinite(v)) v = which ? d.default2 : d.default;
+          set(which, U.clamp(v, d.min, d.max));
+        };
+        nLo.onchange = () => numSet(0, nLo);
+        nHi.onchange = () => numSet(1, nHi);
+        wrap.ondblclick = () => { values[d.key] = d.default; values[k2] = d.default2; paint(); hooks.change(false); };
+        wrap.title = U.t('Double-click to reset');
+        paint();
+        head.append(label, nums);
+        row.append(head, wrap);
         break;
       }
       case 'color': {

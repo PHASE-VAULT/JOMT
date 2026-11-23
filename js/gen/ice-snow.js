@@ -41,7 +41,7 @@
     name: 'Ice / Snow',
     desc: 'Tileable snow and ice from fresh powder and slush to cracked lake ice, glacier and frost, with height map',
     uses: ['Winter ground, frozen lake and glacier materials for 3D terrain, using the height map for drifts, cracks and frost relief.', 'Frosted-glass textures for windows and cold screen effects.'],
-    tags: ['Texturing', 'Nature'],
+    tags: ['PBR', 'Nature'],
     tileable: true,
     heightMap: true,
     icon: U.icon('<path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/><path d="M9.5 4.5L12 7l2.5-2.5M9.5 19.5L12 17l2.5 2.5M4.5 10.2l3.4.9-.9 3.4M19.5 13.8l-3.4-.9.9-3.4" opacity=".7"/>'),

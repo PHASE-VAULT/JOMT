@@ -43,7 +43,7 @@
       { key: 'busbars', label: 'Busbars', type: 'int', min: 0, max: 16, default: 5, tip: 'Vertical silver contact bars per cell' },
       { key: 'busW', label: 'Busbar width', type: 'range', min: 0.3, max: 10, step: 0.05, default: 2, show: (p) => p.busbars > 0, tip: 'px @ 512' },
       { key: 'busStyle', label: 'Busbar style', type: 'select', default: 'solid', show: (p) => p.busbars > 0, options: [['solid', 'Solid bars'], ['pads', 'Segmented pads'], ['wire', 'Round wires']] },
-      { key: 'ribbons', label: 'Ribbons across gaps', type: 'bool', default: true, show: (p) => p.busbars > 0, tip: 'The busbars continue through the gaps between cells (cell strings)' },
+      { key: 'ribbons', label: 'Ribbons across gaps', type: 'bool', default: false, show: (p) => p.busbars > 0, tip: 'The busbars continue through the gaps between cells (cell strings)' },
       { key: 'fingers', label: 'Fingers', type: 'int', min: 0, max: 160, default: 64, show: (p) => p.type !== 'thin', tip: 'Thin horizontal contact lines per cell' },
       { key: 'fingerW', label: 'Finger width', type: 'range', min: 0.1, max: 3, step: 0.05, default: 0.6, show: (p) => p.fingers > 0, tip: 'px @ 512' },
       { key: 'busColor', label: 'Busbar color', type: 'color', default: '#cdd2d7', show: (p) => p.busbars > 0 },
@@ -221,6 +221,7 @@
               if (inX && (cov > 0 || p.ribbons)) {
                 const sp = (cwi - gap) / nb, t = lx - gap / 2, kk = Math.floor(t / sp), d = Math.abs(t - (kk + 0.5) * sp);
                 let bc = clamp(bw / 2 - d + 0.5);
+                if (!p.ribbons) bc *= cov; // only on the cell surface, not over the backsheet
                 if (p.busStyle === 'pads' && cov > 0.5) { const seg = U.mod(ly, chi / 6); bc *= smoothstep(0, 1.5, Math.min(seg, chi / 6 - seg) - chi / 40); }
                 if (bc > 0) {
                   let sh = 1;

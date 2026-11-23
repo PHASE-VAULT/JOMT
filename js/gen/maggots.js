@@ -205,9 +205,10 @@
   function drawShine(c, pts, p, hi, avgHw, lx, ly, small) {
     if (p.shine <= 0) return;
     const n = pts.length - 1, off = avgHw * 0.42;
-    c.fillStyle = css(hi, p.shine * 0.75);
+    const amb = !lx && !ly; // ambient: a soft sheen along the top, no glints
+    c.fillStyle = css(hi, p.shine * (amb ? 0.4 : 0.75));
     tube(c, pts.slice(Math.round(n * 0.08), Math.round(n * 0.85) + 1), 0.2, lx * off, ly * off);
-    if (small) return;
+    if (small || amb) return;
     c.fillStyle = css([255, 255, 255], p.shine * 0.9);
     for (const s of [0.25, 0.55]) {
       const q = pts[Math.round(n * s)];
@@ -330,14 +331,15 @@
       { key: 'gutColor', label: 'Gut color', type: 'color', default: '#4a3622', show: (p) => p.gut > 0 },
       { key: 'mouthColor', label: 'Mouth hooks / spiracles', type: 'color', default: '#2a1a10' },
       { type: 'section', label: 'Shading' },
-      { key: 'light', label: 'Light angle', type: 'range', min: -180, max: 180, step: 1, default: -135, tip: '-135 = light from top-left' },
+      { key: 'lightMode', label: 'Light', type: 'select', default: 'angled', options: [['angled', 'Angled (light angle)'], ['ambient', 'Ambient (soft, no direction)']], tip: 'Ambient: soft light from all around, like an overcast sky: no direction and no glints; bodies darken evenly toward their sides and the contact shadow sits right under them' },
+      { key: 'light', label: 'Light angle', type: 'range', min: -180, max: 180, step: 1, default: -135, show: (p) => p.lightMode !== 'ambient', tip: '-135 = light from top-left' },
       { key: 'lightAmt', label: 'Shading', type: 'range', min: 0, max: 1, step: 0.01, default: 0.75 },
       { key: 'shine', label: 'Wet highlight', type: 'range', min: 0, max: 1, step: 0.01, default: 0.55 },
       { key: 'highlight', label: 'Highlight color', type: 'color', default: '#fffbf0', show: (p) => p.shine > 0 },
       { key: 'outline', label: 'Outline', type: 'range', min: 0, max: 6, step: 0.1, default: 0, tip: 'px @ 512, for stylized looks' },
       { key: 'shadow', label: 'Contact shadow', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5 },
       { key: 'shadowSize', label: 'Shadow softness', type: 'range', min: 0, max: 20, step: 0.25, default: 3, show: (p) => p.shadow > 0, tip: 'px @ 512' },
-      { key: 'shadowDist', label: 'Shadow offset', type: 'range', min: 0, max: 20, step: 0.25, default: 2, show: (p) => p.shadow > 0, tip: 'px @ 512, away from the light' },
+      { key: 'shadowDist', label: 'Shadow offset', type: 'range', min: 0, max: 20, step: 0.25, default: 2, show: (p) => p.shadow > 0 && p.lightMode !== 'ambient', tip: 'px @ 512, away from the light' },
       { key: 'slime', label: 'Slime stain', type: 'range', min: 0, max: 1, step: 0.01, default: 0.25, tip: 'Wet, darker stain where the maggots lie (does not move)' },
       { key: 'slimeColor', label: 'Slime color', type: 'color', default: '#5e4a2c', show: (p) => p.slime > 0 },
       { type: 'section', label: 'Output' },
@@ -374,7 +376,9 @@
       // loop time: tilesheet frame, a frame of the sequence export, the preview frame, or the resting pose
       const N = Math.max(2, p.frameCount | 0), fm = typeof opts.layer === 'string' && /^frame(\d+)$/.exec(opts.layer);
       const t = p._t != null ? p._t : fm ? +fm[1] / N : opts.preview && p.frames && p.previewFrame > 0 ? (Math.min(p.previewFrame, N) - 1) / N : 0;
-      const C = cached(p, W, H), ms = C.ms, la = p.light * RAD, light = [Math.cos(la), Math.sin(la)];
+      const C = cached(p, W, H), ms = C.ms, la = p.light * RAD;
+      // ambient: no light direction (centered cylinder shading and contact shadow)
+      const light = p.lightMode === 'ambient' ? [0, 0] : [Math.cos(la), Math.sin(la)];
       const bodies = ms.map((m) => spine(m, p, t));
 
       if (opts.height || p.output === 'height') {

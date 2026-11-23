@@ -855,6 +855,7 @@ UGTG.addLang('de', {
   "Graphite gradient": "Graphitverlauf",
   "Grass": "Gras",
   "Grass Billboard": "Gras-Billboard",
+  "Tree Impostor": "Baum-Impostor",
   "Grass card": "Gras-Card",
   "Grass tuft card": "Grasbüschel-Card",
   "Grass tufts (top-down)": "Grasbüschel (Draufsicht)",

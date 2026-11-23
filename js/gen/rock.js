@@ -30,12 +30,14 @@
 
   /* periodic cellular noise: distances to the nearest / second feature point, the nearest cell's random id and
      `face`: a random tilted plane through that cell's feature point (flat, faceted rock faces) */
+  // integer wrap into 0..n-1 (same as U.mod for whole numbers, one % instead of two)
+  const wr = (i, n) => { i %= n; return i < 0 ? i + n : i; };
   const CELL = { f1: 0, f2: 0, id: 0, face: 0 };
   function cell(x, y, px, py, s) {
     const xi = Math.floor(x), yi = Math.floor(y);
     let f1 = 1e9, f2 = 1e9, best = 0, dx1 = 0, dy1 = 0;
     for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
-      const cx = xi + i, cy = yi + j, wx = U.mod(cx, px), wy = U.mod(cy, py);
+      const cx = xi + i, cy = yi + j, wx = wr(cx, px), wy = wr(cy, py);
       const dx = cx + U.hash(wx, wy, s) - x, dy = cy + U.hash(wx, wy, s + 7919) - y, d = dx * dx + dy * dy;
       if (d < f1) { f2 = f1; f1 = d; best = wx * 73856093 ^ wy * 19349663; dx1 = dx; dy1 = dy; } else if (d < f2) f2 = d;
     }
@@ -52,13 +54,13 @@
     for (let n = 0; n < 2; n++) {
       for (let y = 0; y < h; y++) {
         const o = y * w; let s = 0;
-        for (let k = -r; k <= r; k++) s += a[o + U.mod(k, w)];
-        for (let x = 0; x < w; x++) { t[o + x] = s * inv; s += a[o + U.mod(x + r + 1, w)] - a[o + U.mod(x - r, w)]; }
+        for (let k = -r; k <= r; k++) s += a[o + wr(k, w)];
+        for (let x = 0; x < w; x++) { t[o + x] = s * inv; s += a[o + wr(x + r + 1, w)] - a[o + wr(x - r, w)]; }
       }
       for (let x = 0; x < w; x++) {
         let s = 0;
-        for (let k = -r; k <= r; k++) s += t[U.mod(k, h) * w + x];
-        for (let y = 0; y < h; y++) { a[y * w + x] = s * inv; s += t[U.mod(y + r + 1, h) * w + x] - t[U.mod(y - r, h) * w + x]; }
+        for (let k = -r; k <= r; k++) s += t[wr(k, h) * w + x];
+        for (let y = 0; y < h; y++) { a[y * w + x] = s * inv; s += t[wr(y + r + 1, h) * w + x] - t[wr(y - r, h) * w + x]; }
       }
     }
     return a;
@@ -72,7 +74,7 @@
       'Seamless cliff, mountain and cave materials for 3D terrain and rock meshes: use the flat albedo with the height-based normal map and the Smoothness mode for a full material set.',
       'Rock walls, ledges and backgrounds for 2D platformers and hand-painted or toon-styled games.',
     ],
-    tags: ['Texturing', 'Nature'],
+    tags: ['PBR', 'Nature'],
     tileable: true,
     heightMap: true,
     normalDesc: 'Normal map from the rock height field (strata, facets, cracks; snow and moss slightly raised)',
@@ -127,7 +129,8 @@
       { type: 'section', label: 'Shading' },
       { key: 'style', label: 'Style', type: 'select', default: 'realistic', options: [['realistic', 'Realistic'], ['painted', 'Hand-painted'], ['toon', 'Toon (bands + outlines)']] },
       { key: 'bands', label: 'Light bands', type: 'int', min: 2, max: 6, default: 3, show: (p) => p.style === 'toon' },
-      { key: 'light', label: 'Light angle', type: 'range', min: -180, max: 180, step: 1, default: -125, tip: '-90 = light from the top, -135 = top-left' },
+      { key: 'lightMode', label: 'Light', type: 'select', default: 'angled', options: [['angled', 'Angled (light angle)'], ['ambient', 'Ambient (soft, no direction)']], tip: 'Ambient: soft light from all around, like an overcast sky: no direction, slopes and cavities darken gently; best when the engine adds its own light' },
+      { key: 'light', label: 'Light angle', type: 'range', min: -180, max: 180, step: 1, default: -125, show: (p) => p.lightMode !== 'ambient', tip: '-90 = light from the top, -135 = top-left' },
       { key: 'lightAmt', label: 'Shading', type: 'range', min: 0, max: 1, step: 0.01, default: 0.75 },
       { key: 'bump', label: 'Relief depth', type: 'range', min: 0.1, max: 3, step: 0.05, default: 1, tip: 'How steep the relief is lit (and how strongly overlays follow it)' },
       { key: 'cavity', label: 'Cavity darkening', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6, tip: 'Ambient occlusion in cracks and hollows' },
@@ -178,7 +181,7 @@
         for (let jj = 0, k = 0; jj < hh; jj++) for (let ii = 0; ii < w; ii++, k++) a[k] = fn(ii / w, jj / hh);
         return (u, v) => {
           const fx = u * w, fy = v * hh, x0 = Math.floor(fx), y0 = Math.floor(fy), tx = fx - x0, ty = fy - y0;
-          const xa = U.mod(x0, w), xb = U.mod(x0 + 1, w), ya = U.mod(y0, hh) * w, yb = U.mod(y0 + 1, hh) * w;
+          const xa = wr(x0, w), xb = wr(x0 + 1, w), ya = wr(y0, hh) * w, yb = wr(y0 + 1, hh) * w;
           const A = a[ya + xa] + (a[ya + xb] - a[ya + xa]) * tx, B = a[yb + xa] + (a[yb + xb] - a[yb + xa]) * tx;
           return A + (B - A) * ty;
         };
@@ -278,6 +281,7 @@
       const R = new Float32Array(N), G = new Float32Array(N), B = new Float32Array(N), Hout = new Float32Array(N);
       const c1 = U.hex(p.c1), c2 = U.hex(p.c2), c3 = U.hex(p.c3), mc = U.hex(p.mossColor), sc = U.hex(p.snowColor), lc = U.hex(p.lichenColor), dc = U.hex(p.dirtColor), vc = U.hex(p.veinColor);
       const la = p.light * RAD, el = 0.75, Lx = Math.cos(la) * el, Ly = Math.sin(la) * el, Lz = Math.sqrt(1 - el * el) + 0.35, Ln = Math.hypot(Lx, Ly, Lz);
+      const ambient = p.lightMode === 'ambient', lamFlat = Lz / Ln; // ambient: a flat face as bright as in angled mode
       const bumpK = p.bump * 0.11 / Math.sqrt(s / 3); // relief steepness, independent of resolution
       const toon = p.style === 'toon', painted = p.style === 'painted', bands = Math.max(2, p.bands | 0);
       for (let j = 0, o = 0; j < gh; j++) {
@@ -327,7 +331,8 @@
           Hout[o] = hOut;
           if (!albedo && !heightOut) {
             // lighting: lambert + ambient, cavity occlusion, edge highlights; toon bands / painted softening
-            let lam = Math.max(0, (nx * Lx + ny * Ly + nz * Lz) / Ln);
+            // ambient (sky from all around): slopes see less of the sky and darken gently, whichever way they face
+            let lam = ambient ? lamFlat * Math.max(0.3, 1 - (1 - nz * nz) * 1.1) : Math.max(0, (nx * Lx + ny * Ly + nz * Lz) / Ln);
             if (snowK > 0) lam = lerp(lam, 0.55 + lam * 0.5, snowK * 0.5);
             let lit = 0.35 + 0.9 * lam;
             if (toon) lit = 0.5 + (Math.min(bands - 1, Math.floor(lam * bands * 0.999 + 0.25)) / (bands - 1)) * 0.75;

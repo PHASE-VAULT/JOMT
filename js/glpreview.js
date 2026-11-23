@@ -1,5 +1,6 @@
 /* Live WebGL refraction preview for normal-map generators (Glass & Refraction Normals, Water Normals).
-   A small box in the corner of the viewport shows a background scene seen through the current normal
+   By default it fills the viewport (the texture itself moves to a thumbnail in the corner panel); the ⇄
+   button swaps back to a small preview box over the texture. It shows a background scene seen through the current normal
    map: UV offset by the normal's XY (refraction / distortion), optional chromatic split, a specular
    highlight and, for water, two copies scrolling against each other.
    A generator opts in with `glPreview: { isNormal(p), flipY(p), water? }`; the app calls
@@ -12,7 +13,8 @@
   const TEX = 512;
 
   const BGS = [['tiles', 'Pool tiles'], ['scene', 'Landscape'], ['text', 'Text'], ['checker', 'Checker'], ['stripes', 'Stripes'], ['ui', 'UI panel']];
-  const DEF = { bg: 'tiles', amt: 0.35, tile: 1, anim: true, spec: 0.6, chrom: 0.15, tint: 0.15 };
+  // main: the preview fills the viewport and the texture sits in the corner panel (false = small preview box)
+  const DEF = { bg: 'tiles', amt: 0.35, tile: 1, anim: true, spec: 0.6, chrom: 0.15, tint: 0.15, main: true };
 
   let st = Object.assign({}, DEF);
   try { Object.assign(st, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { /* defaults */ }
@@ -176,8 +178,20 @@
     cb.onchange = () => { st.anim = cb.checked; store(); loop(); };
     const animRow = row('Animate (water)', cb);
     animRow.parentNode.classList.add('gl-anim');
-    const fold = box.querySelector('.gl-fold');
-    fold.onclick = () => { box.classList.toggle('folded'); };
+    box.querySelector('.gl-gear').onclick = () => { box.classList.toggle('folded'); };
+    box.querySelector('.gl-swap').onclick = () => { st.main = !st.main; store(); layout(); draw(); };
+    window.addEventListener('resize', () => { if (visible) { layout(); draw(); } });
+    layout();
+  }
+
+  // main mode: the square preview canvas takes the largest size that fits the viewport area
+  function layout() {
+    if (!box) return;
+    box.classList.toggle('main', !!st.main);
+    if (st.main && visible) {
+      const s = Math.max(96, Math.floor(Math.min(box.clientWidth, box.clientHeight) - 48));
+      cv.style.width = cv.style.height = s + 'px';
+    } else cv.style.width = cv.style.height = '';
   }
 
   function draw(time) {
@@ -218,11 +232,20 @@
   }
 
   U.glPreview = {
-    /* src: the rendered normal map (any size; resampled to a square power-of-two texture) */
-    update(src, p, gen) {
+    /* src: the rendered normal map (any size; resampled to a square power-of-two texture);
+       tex: what the main view shows (the texture), drawn into the corner panel in main mode */
+    update(src, p, gen, tex) {
       build();
       if (!box) return;
-      if (!visible) { box.hidden = false; visible = true; }
+      if (!visible) { box.hidden = false; visible = true; layout(); }
+      const tc = document.getElementById('glTex');
+      if (tc && (tex || src)) {
+        const t = tex || src;
+        if (tc.width !== t.width || tc.height !== t.height) { tc.width = t.width; tc.height = t.height; }
+        const tg = tc.getContext('2d');
+        tg.clearRect(0, 0, tc.width, tc.height);
+        tg.drawImage(t, 0, 0);
+      }
       if (!initGL()) { box.classList.add('nogl'); return; }
       const g = normCv.getContext('2d');
       g.imageSmoothingEnabled = true;
