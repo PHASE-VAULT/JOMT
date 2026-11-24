@@ -144,6 +144,8 @@
     }
     return { pts, veins, holes, maxW, inX, needle: false };
   }
+  // shared with the Leaf Litter generator (fallen leaves use the same outlines)
+  U.leafShapes = { SHAPES, buildVariant };
 
   // separable box blur (clamped edges), two passes ≈ tent filter
   function blur(a, W, H, r) {

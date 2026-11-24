@@ -57,6 +57,7 @@
     symbol: [0.3, 0.6, 'a', false, 'Painted symbols: satin paint'],
     'blood-ui': [0.55, 0.92, 'a', false, 'Fresh blood is wet and glossy where it is thick, rougher on the thin film; for dried stains lower the max to ~0.35'],
     'metal-surface': [0, 1, 'rough', true, 'Exact roughness from the generator: polished and worn bare metal glossy, brushed and blasted finishes satin, paint ~0.5, rust, verdigris and dirt rough'],
+    'leaf-litter': [0.08, 0.4, 'luma', false, 'Dry fallen leaves are matte; fresh, waxy leaves a bit smoother. For wet leaves after rain raise the max to ~0.7'],
     polymer: [0, 1, 'rough', true, 'Exact roughness from the generator: ABS and clear-coated carbon fairly glossy, nylon polymer satin, hard rubber and soft-touch matte; handling polish and oil glossier, scratches, scuffs, fading and dust rougher'],
     footprints: [0.15, 0.6, 'luma', true, 'Mud and sand prints are rough, the darker wet bottom of a mud print a little glossy; raise the max to ~0.85 for wet or bloody prints, snow ~0.3'],
     cobweb: [0.3, 0.6, 'a', false, 'Silk threads are satin; dew drops are glossy (~0.9) and dust matte (~0.2)'],

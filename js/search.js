@@ -38,6 +38,7 @@
     'ice-snow': 'ice snow frost frozen winter cold',
     impact: 'bullet impact hole decal crack hit damage',
     insect: 'insect insects bug bugs spider beetle fly ant cockroach butterfly sprite',
+    'leaf-litter': 'leaf litter fallen leaves autumn fall foliage ground forest floor leaf pile carpet mask decal maple oak birch pine needles twigs terrain blend splat',
     leaves: 'leaves leaf branch branches twig foliage tree bush card cutout alpha needles pine spruce fir conifer fern frond palm ivy vine blossom berries bamboo twigs crown hedge',
     lensflare: 'lens flare sun glare bloom light',
     lightCone: 'light cone beam lamp spotlight volumetric glow',
