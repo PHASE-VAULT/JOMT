@@ -1,12 +1,12 @@
 /* Survival organs: grungy status icons for survival / horror HUDs: heart, lungs, stomach, brain, head,
-   skull, full body (segmented into parts), liver, kidneys, intestines, eye, bone and a drop.
+   skull, liver, kidneys, intestines, eye, bone and a drop.
    Each organ is a union of simple primitives (paths, thick strokes, ellipses, cut-outs) in a 100-unit
    box. From that mask a signed distance field (exact Euclidean distance transform) is built, so the
-   outline, the inset fill, edge roughness and the body-part seams work on overlapping primitives.
+   outline, the inset fill and edge roughness work on overlapping primitives.
    Layers: background (empty organ + shadow), fill (the content: flesh, liquid, gradient, hatch or
    solid, clipped to the fill amount with an optional liquid surface), outline (border + anatomical
    detail lines) and a progress map (gray = position along the fill direction) so the engine can fill
-   the organ from one texture. The full body can export one fill layer per body part. Wear: the shared
+   the organ from one texture. Wear: the shared
    noise / grunge stack (js/wear.js). Units are px @ 256 px short side. */
 (function () {
   'use strict';
@@ -15,25 +15,11 @@
 
   /* ---------- shapes (100 × 100 units) ----------
      prims:   f = filled svg path, s = stroked svg path (w = width), e = ellipse [cx, cy, rx, ry, deg],
-              cut: true removes it, mx: true mirrors it (x -> 100 - x), part = body part, clip = [x, y, w, h]
+              cut: true removes it, mx: true mirrors it (x -> 100 - x)
      details: d = line, tube = both edges of a tube (w = tube width), c = circle [cx, cy, r] (fill = dot),
               a = opacity, mx = mirrored copy */
-  // full body: the classic status-screen figure (round head on a neck, rounded shoulders, torso narrowing to
-  // the waist, a briefs-shaped hip segment, arms hanging close to the body, long straight legs with a gap)
-  const TORSO = 'M41.5 19.6 C45.5 18.9 54.5 18.9 58.5 19.6 C63 20.4 65.2 22.6 65.2 26.2 C65.2 31 63.4 36.6 61 41.4 C59.9 43.8 59.4 46.4 59.5 50.5 L40.5 50.5 C40.6 46.4 40.1 43.8 39 41.4 C36.6 36.6 34.8 31 34.8 26.2 C34.8 22.6 37 20.4 41.5 19.6 Z';
-  const PELVIS = 'M40.3 49.5 L59.7 49.5 C61.8 52.4 62.8 56.4 62.3 61 C58.6 62.6 54 62.6 51 61.2 L50 57.8 L49 61.2 C46 62.6 41.4 62.6 37.7 61 C37.2 56.4 38.2 52.4 40.3 49.5 Z';
   const BEAN = 'M30 18 C17 18 11 33 11 50 C11 67 17 82 30 82 C40 82 45 74 43 65 C41 59 36.5 56 36.5 50 C36.5 44 41 41 43 35 C45 27 40 18 30 18 Z';
   const COIL = 'M34 36 C46 30 58 30 66 36 C70 42 62 48 50 46 C38 44 31 50 35 57 C41 63 57 61 64 65 C69 71 59 77 48 75 C40 73 35 77 40 83';
-  const arm = (part, mx) => [
-    { s: 'M35.8 23.2 C33.6 29 32.4 34.4 31.9 40.4', w: 6.4, part, mx }, // upper arm
-    { s: 'M31.9 40.4 C31.3 46 30.8 51 30.4 55.4', w: 5.2, part, mx }, // forearm
-    { e: [30.2, 59.4, 3, 4.2, 4], part, mx }, // hand, at mid-thigh height
-  ];
-  const leg = (part, mx) => [
-    { s: 'M44.4 58 C44.1 65 43.9 71.5 43.8 78.2', w: 9.2, part, mx }, // thigh
-    { s: 'M43.8 78.2 C43.6 84 43.4 89 43.2 93.6', w: 6.4, part, mx }, // shin
-    { e: [41.9, 96.3, 3.9, 2.2, -6], part, mx }, // foot, turned slightly outward
-  ];
 
   const ORGANS = {
     heart: {
@@ -105,26 +91,6 @@
       ],
       details: [{ d: 'M37 75.5 L63 75.5' }, { d: 'M42 72 L42 80' }, { d: 'M46 72 L46 81.5' }, { d: 'M50 72 L50 82' }, { d: 'M54 72 L54 81.5' }, { d: 'M58 72 L58 80' }, { d: 'M50 12 C47 20 53 26 50 33', a: 0.5 }],
     },
-    body: {
-      name: 'Full body',
-      parts: [['head', 'Head'], ['chest', 'Chest'], ['stomach', 'Stomach'], ['armL', 'Arm (left side)'], ['armR', 'Arm (right side)'], ['legL', 'Leg (left side)'], ['legR', 'Leg (right side)']],
-      prims: [
-        { e: [50, 8.6, 6.2, 7.3, 0], part: 'head' },
-        { s: 'M50 14 L50 20.5', w: 4.6, part: 'head' },
-        { f: TORSO, part: 'chest', clip: [0, 0, 100, 36] },
-        { f: TORSO, part: 'stomach', clip: [0, 36, 100, 64] },
-        { f: PELVIS, part: 'stomach' },
-        ...arm('armL', false), ...arm('armR', true),
-        ...leg('legL', false), ...leg('legR', true),
-      ],
-      details: [
-        { d: 'M43 23.5 C46 25 54 25 57 23.5', a: 0.45 }, // collarbones
-        { d: 'M50 38.5 L50 46', a: 0.35 },
-        { d: 'M40.4 50.5 C46 51.6 54 51.6 59.6 50.5', a: 0.75 }, // waistband
-        { d: 'M40.6 78.2 L46.6 78.2', a: 0.35, mx: true }, // knees
-        { d: 'M33.4 40.4 L30.4 40.4', a: 0.35, mx: true }, // elbows
-      ],
-    },
     liver: {
       name: 'Liver',
       prims: [
@@ -166,20 +132,17 @@
       details: [{ d: 'M33 64 C33 74 39 81 47 83', a: 0.8 }],
     },
   };
-  const BODY_PARTS = ORGANS.body.parts;
 
   const pathCache = new Map();
   const P2 = (s) => { let p = pathCache.get(s); if (!p) pathCache.set(s, (p = new Path2D(s))); return p; };
 
   /* draw primitives (white) in unit space with transform T = [s, tx, ty, flip] */
-  function drawPrims(c, prims, T, filter, mode) {
+  function drawPrims(c, prims, T) {
     for (const pr of prims) {
-      if (filter && !filter(pr)) continue;
       c.save();
       c.setTransform(T[3] ? -T[0] : T[0], 0, 0, T[0], T[3] ? T[1] + 100 * T[0] : T[1], T[2]);
       if (pr.mx) c.transform(-1, 0, 0, 1, 100, 0);
-      if (pr.clip) { c.beginPath(); c.rect(pr.clip[0], pr.clip[1], pr.clip[2], pr.clip[3]); c.clip(); }
-      c.globalCompositeOperation = pr.cut ? 'destination-out' : mode || 'source-over';
+      c.globalCompositeOperation = pr.cut ? 'destination-out' : 'source-over';
       c.fillStyle = c.strokeStyle = '#fff';
       if (pr.f) c.fill(P2(pr.f));
       else if (pr.s) { c.lineWidth = pr.w; c.lineCap = 'round'; c.lineJoin = 'round'; c.stroke(P2(pr.s)); }
@@ -188,7 +151,7 @@
     }
     // cut-outs apply to everything drawn before them; draw them last so later prims can't refill them
     for (const pr of prims) {
-      if (!pr.cut || (filter && !filter(pr))) continue;
+      if (!pr.cut) continue;
       c.save();
       c.setTransform(T[3] ? -T[0] : T[0], 0, 0, T[0], T[3] ? T[1] + 100 * T[0] : T[1], T[2]);
       if (pr.mx) c.transform(-1, 0, 0, 1, 100, 0);
@@ -288,24 +251,20 @@
   const WEAR_DEF = { grunge: 0.28, grungeType: 'chipped', grungeScale: 9, edgeWear: 0.35, dirt: 0.3, scratches: 0.15, brightNoise: 0.12 };
   for (const d of WEAR) if (d.key && d.key in WEAR_DEF) d.default = WEAR_DEF[d.key];
 
-  const isBody = (p) => p.organ === 'body';
   const FILL_STYLES = [['flesh', 'Flesh (mottled + veins)'], ['liquid', 'Liquid (bubbles)'], ['gradient', 'Gradient'], ['hatch', 'Hatched (ink)'], ['solid', 'Solid']];
 
   U.register({
     id: 'organ',
     name: 'Survival Organs',
-    desc: 'Grungy organ status icons (heart, lungs, stomach, brain, skull, body parts …) with a separate fill layer and progress map',
-    uses: ['HUD status icons for survival and horror games: health (heart), stamina (lungs), hunger (stomach), sanity (brain), thirst (kidneys, drop) and per-limb damage on a segmented body; export outline, fill and progress map as aligned layers and fill them in the engine.', 'Inventory and medical UI icons, e.g. for organ items, injuries and status effects.'],
+    desc: 'Grungy organ status icons (heart, lungs, stomach, brain, skull, liver …) with a separate fill layer and progress map',
+    uses: ['HUD status icons for survival and horror games: health (heart), stamina (lungs), hunger (stomach), sanity (brain), thirst (kidneys, drop) and toxicity (liver); export outline, fill and progress map as aligned layers and fill them in the engine.', 'Inventory and medical UI icons, e.g. for organ items, injuries and status effects.'],
     tags: ['UI', 'Horror'],
     aspect: '1:1',
     bg: 'gray',
     icon: U.icon('<path d="M12 20c-4-2.5-8-6-8-10a4 4 0 0 1 7-2.6A4 4 0 0 1 20 10c0 4-4 7.5-8 10z"/><path d="M8 14h8" opacity=".6"/><path d="M7 16.5c2 1.5 8 1.5 10 0" opacity=".35"/>'),
     exportLayers: (p) => {
       if (!p.split) return null;
-      const out = [{ id: 'back', suffix: 'bg' }];
-      if (isBody(p) && p.splitParts) for (const [id] of BODY_PARTS) out.push({ id: 'fill_' + id, suffix: 'fill_' + id });
-      else out.push({ id: 'fill', suffix: 'fill' });
-      out.push({ id: 'frame', suffix: 'outline' });
+      const out = [{ id: 'back', suffix: 'bg' }, { id: 'fill', suffix: 'fill' }, { id: 'frame', suffix: 'outline' }];
       if (p.progressMap) out.push({ id: 'mask', suffix: 'progress' });
       return out;
     },
@@ -351,13 +310,6 @@
       { key: 'glowColor', label: 'Glow color', type: 'color', default: '#ff3a2a', show: (p) => p.glow > 0 },
       { key: 'glowSize', label: 'Glow size', type: 'range', min: 1, max: 40, step: 0.5, default: 10, show: (p) => p.glow > 0 },
 
-      { type: 'section', label: 'Body parts', show: isBody },
-      { key: 'segments', label: 'Part seams', type: 'bool', default: true, tip: 'Gaps between head, chest, stomach, arms and legs' },
-      { key: 'segW', label: 'Seam width', type: 'range', min: 0.5, max: 10, step: 0.25, default: 2.5, show: (p) => p.segments },
-      { key: 'highlight', label: 'Highlight part', type: 'select', default: 'none', options: [['none', 'None']].concat(BODY_PARTS), tip: 'Preview / combined image: tints one part, e.g. an injured limb' },
-      { key: 'highlightColor', label: 'Highlight color', type: 'color', default: '#e8a02a', show: (p) => p.highlight !== 'none' },
-      { key: 'splitParts', label: 'One fill layer per part', type: 'bool', default: false, show: (p) => p.split, tip: 'Separate layer export: a fill file per body part (head, chest, stomach, arms, legs) to tint each by its health' },
-
       ...WEAR,
 
       { type: 'section', label: 'Output' },
@@ -378,10 +330,7 @@
       { name: 'Eye · vision', group: 'Status', values: { organ: 'eye', fillStyle: 'gradient', fillColor: '#e8e2d6', fillColor2: '#8a7a6a', value: 1, wave: 0, surface: 0, detailW: 3.5 } },
       { name: 'Bone · fracture', group: 'Status', values: { organ: 'bone', fillStyle: 'gradient', fillColor: '#e6dcc4', fillColor2: '#8a7a5a', value: 1, wave: 0, surface: 0, grungeType: 'cracks', grunge: 0.35 } },
       { name: 'Skull · infection', group: 'Status', values: { organ: 'skull', fillStyle: 'gradient', fillColor: '#ddd2b8', fillColor2: '#6a5a40', value: 0.5, fillDir: 'down', wave: 0.2 } },
-      { name: 'Body · limb damage', group: 'Body', values: { organ: 'body', fillStyle: 'gradient', fillColor: '#8a9a7a', fillColor2: '#3a4a32', value: 1, wave: 0, surface: 0, detail: 0.5, borderW: 4, highlight: 'armL', highlightColor: '#d8342b', margin: 0.04 } },
-      { name: 'Body · green status outline', group: 'Body', values: { organ: 'body', fillStyle: 'solid', fillColor: '#123a10', value: 1, wave: 0, surface: 0, borderW: 2.5, borderColor: '#8dff6e', detail: 0.9, detailW: 1.4, detailColor: '#6ee858', detailCut: false, rough: 0.04, pad: 1.5, shade: 0.35, rim: 0, segments: true, segW: 1.2, backColor: '#0a1a08', backAlpha: 0.9, shadowAlpha: 0, glow: 0.55, glowColor: '#4cff3a', glowSize: 7, grunge: 0, dirt: 0, edgeWear: 0, margin: 0.05 } },
-      { name: 'Body · status silhouette', group: 'Body', values: { organ: 'body', fillStyle: 'solid', fillColor: '#5fe3b0', value: 1, wave: 0, surface: 0, detail: 0, borderW: 3.5, segW: 2, grunge: 0.15, dirt: 0.15, edgeWear: 0.2, shade: 0.3, margin: 0.04, splitParts: true } },
-      { name: 'Head · concussion', group: 'Body', values: { organ: 'head', fillStyle: 'gradient', fillColor: '#d8a07a', fillColor2: '#6a3a24', value: 0.7, highlight: 'none' } },
+      { name: 'Head · concussion', group: 'Status', values: { organ: 'head', fillStyle: 'gradient', fillColor: '#d8a07a', fillColor2: '#6a3a24', value: 0.7 } },
       { name: 'Bloody grunge heart', group: 'Style', values: { fillColor: '#c41e18', fillColor2: '#3a0806', veins: 0.8, grunge: 0.45, dirt: 0.5, dirtColor: '#2a0604', scratches: 0.35, rough: 0.6, value: 0.85 } },
       { name: 'Clean flat icon', group: 'Style', values: { fillStyle: 'solid', fillColor: '#e0453a', rough: 0, grunge: 0, edgeWear: 0, dirt: 0, scratches: 0, brightNoise: 0, shade: 0.25, rim: 0.2, shadowAlpha: 0.3, wave: 0.2 } },
       { name: 'Ink-hatched lungs', group: 'Style', values: { organ: 'lungs', fillStyle: 'hatch', fillColor: '#e8dcc4', fillColor2: '#6a5a48', texScale: 10, backColor: '#e8dcc4', backAlpha: 0.25, shade: 0.2, rim: 0, value: 1, wave: 0, surface: 0 } },
@@ -425,32 +374,6 @@
         for (let i = 0; i < N; i++) det[i] *= clamp(0.5 - (sdf[i] + bwPx * 0.3)) * p.detail;
       }
 
-      // body parts: partition of the silhouette in priority order, seams where neighbouring parts meet
-      let partA = null, partId = null;
-      const body = key === 'body';
-      if (body) {
-        partA = BODY_PARTS.map(([id], n) => {
-          const c = U.canvas(W, H), g = c.getContext('2d');
-          drawPrims(g, org.prims, T, (pr) => pr.part === id);
-          // earlier parts own the overlaps (e.g. the torso keeps the shoulders)
-          for (let m = 0; m < n; m++) drawPrims(g, org.prims, T, (pr) => pr.part === BODY_PARTS[m][0] && !pr.cut, 'destination-out');
-          return alphaOf(c);
-        });
-        partId = new Int8Array(N).fill(-1);
-        for (let i = 0; i < N; i++) { let best = 0.25, id = -1; for (let n = 0; n < partA.length; n++) if (partA[n][i] > best) { best = partA[n][i]; id = n; } partId[i] = id; }
-        if (p.segments && p.segW > 0) {
-          const r = Math.max(1, Math.round((p.segW * k) / 2)), seam = new Float32Array(N);
-          for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-            const i = y * W + x, a = partId[i];
-            if (a < 0) continue;
-            const q = (xx, yy) => { if (xx < 0 || yy < 0 || xx >= W || yy >= H) return a; const b = partId[yy * W + xx]; return b < 0 ? a : b; };
-            if (q(x - r, y) !== a || q(x + r, y) !== a || q(x, y - r) !== a || q(x, y + r) !== a) seam[i] = 1;
-          }
-          det = det || new Float32Array(N);
-          for (let i = 0; i < N; i++) if (seam[i]) det[i] = Math.max(det[i], clamp(0.5 - (sdf[i] + bwPx * 0.3)));
-        }
-      }
-
       // fill extent along the fill direction (bounding box of the fill region)
       let x0 = W, x1 = 0, y0 = H, y1 = 0;
       for (let y = 0, i = 0; y < H; y++) for (let x = 0; x < W; x++, i++) if (sdf[i] + inset < 0.5) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
@@ -465,9 +388,7 @@
       const ts = p.texScale / S;
       const mott = p.fillStyle === 'flesh' || p.fillStyle === 'liquid' ? U.coarseField(W, H, 220, (x, y) => U.fractal('perlin', x * ts, y * ts, 0, 0, 4, 0.55, 'fbm', seed + 5)) : null;
       const veinF = p.fillStyle === 'flesh' && p.veins > 0 ? U.coarseField(W, H, 320, (x, y) => U.fractal('perlin', x * ts * 1.6 + 7.1, y * ts * 1.6, 0, 0, 4, 0.5, 'ridged', seed + 6)) : null;
-      const fc1 = U.hex(p.fillColor), fc2 = U.hex(p.fillColor2), hlC = U.hex(p.highlightColor);
-      const hlIdx = body ? BODY_PARTS.findIndex(([id]) => id === p.highlight) : -1;
-      const fillPart = /^fill_/.test(layer) ? BODY_PARTS.findIndex(([id]) => 'fill_' + id === layer) : -1;
+      const fc1 = U.hex(p.fillColor), fc2 = U.hex(p.fillColor2);
       const shadeW = Math.max(2, 22 * k), rimW = Math.max(1.5, 7 * k);
       const L = [-0.62, -0.78]; // light from the top-left (image space)
       const bcol = U.hex(p.borderColor), dcol = U.hex(p.detailColor), backC = U.hex(p.backColor);
@@ -495,7 +416,6 @@
             const fin = sd + inset;
             let a = clamp(0.5 - fin);
             if (a <= 0) continue;
-            if (fillPart >= 0) a *= partA[fillPart][i];
             if (det && p.detailCut) a *= 1 - det[i];
             const t = tAt(x + 0.5, y + 0.5);
             if (what === 'mask') { const g = clamp(t) * 255; o[k4] = o[k4 + 1] = o[k4 + 2] = g; o[k4 + 3] = a * 255; continue; }
@@ -525,10 +445,6 @@
               f = clamp(v * 0.5 + (q < 0.35 + v * 0.3 ? 0.55 : 0) - 0.1);
             } else if (p.fillStyle === 'solid') f = 0;
             r = lerp(fc1[0], fc2[0], f); g = lerp(fc1[1], fc2[1], f); b = lerp(fc1[2], fc2[2], f);
-            if (hlIdx >= 0 && !sep && partA[hlIdx][i] > 0) {
-              const m = partA[hlIdx][i] * 0.85, l = 0.55 + 0.6 * (1 - f);
-              r = lerp(r, hlC[0] * l, m); g = lerp(g, hlC[1] * l, m); b = lerp(b, hlC[2] * l, m);
-            }
             // inner shade, rim light (from the SDF gradient), surface line
             const depth = -fin;
             const shade = 1 - p.shade * 0.6 * (1 - smoothstep(0, shadeW, depth));
@@ -584,7 +500,7 @@
       }
       const parts = [];
       if (layer === 'all' || layer === 'back') parts.push(withShadow(finish(build('back'), 'frame')));
-      if (layer === 'all' || layer === 'fill' || fillPart >= 0) parts.push(finish(build('fill'), 'fill'));
+      if (layer === 'all' || layer === 'fill') parts.push(finish(build('fill'), 'fill'));
       if (layer === 'all' || layer === 'frame') parts.push(finish(build('frame'), 'frame'));
       for (const cv of parts) ctx.drawImage(cv, 0, 0);
     },

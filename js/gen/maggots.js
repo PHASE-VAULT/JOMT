@@ -280,7 +280,7 @@
     name: 'Maggots',
     desc: 'Ground decals of maggots and grubs, scattered or in piles, with height map and looping twitch animation',
     uses: ['Infestation decals on corpses, food or floors in horror and survival games, animated as a looping flipbook or frame sequence.', 'Writhing creature sprites for gore particles and alien-biology effects.'],
-    tags: ['Horror', 'Decals', 'Nature'],
+    tags: ['Horror', 'Decals', 'Nature', 'Animation'],
     heightMap: true,
     // tilesheet mode: a seamless twitching loop
     animLoop: true,

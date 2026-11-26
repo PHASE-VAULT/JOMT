@@ -1,6 +1,8 @@
-/* Arcade weapon skins: tileable, abstract gun-skin patterns in a loud, arcade shooter style.
+/* Arcade weapon skins: tileable gun-skin patterns in a loud, arcade shooter style.
    One base pattern (geometric shards, low-poly triangles, hex tech, tiger stripes, acid fluid,
-   circuit traces, glitch, paint splatter, dragon scales, digital blocks, neon contours, carbon weave)
+   circuit traces, glitch, paint splatter, dragon scales, digital blocks, neon contours, carbon weave;
+   camo: woodland, digital, military tiger stripe, splinter; animal: zebra, leopard, cheetah, giraffe,
+   python; motifs: ornate damask, flames; any of them can be pixelated into a digital version)
    is mapped through a 4-color palette (smooth ramp or flat steps), then overlays: ink outlines,
    facet shading, halftone dots, metallic flake, emissive glow and scanlines; finally wear: worn-off
    paint revealing brushed metal (biased toward edges), scratches and dirt.
@@ -17,6 +19,9 @@
     ['shards', 'Geometric shards'], ['triangles', 'Low-poly triangles'], ['hex', 'Hex tech'], ['stripes', 'Tiger stripes'],
     ['fluid', 'Acid fluid'], ['circuit', 'Circuit traces'], ['glitch', 'Glitch'], ['splatter', 'Paint splatter'],
     ['scales', 'Dragon scales'], ['blocks', 'Digital blocks'], ['topo', 'Neon contours'], ['carbon', 'Carbon weave'],
+    ['woodland', 'Woodland camo'], ['digital', 'Digital camo'], ['tigercamo', 'Tiger stripe camo'], ['splinter', 'Splinter camo'],
+    ['zebra', 'Zebra'], ['leopard', 'Leopard'], ['cheetah', 'Cheetah'], ['giraffe', 'Giraffe'], ['snake', 'Python skin'],
+    ['ornate', 'Ornate damask'], ['flames', 'Flames'],
   ];
   const PALETTES = {
     neon: ['#0d0b1e', '#ff2a8a', '#2af0ff', '#f6f0ff'],
@@ -33,28 +38,40 @@
     candy: ['#ff5f9e', '#ffd25f', '#5fe3b0', '#ffffff'],
     sci: ['#f2f0ea', '#1a1a1a', '#ff6a1a', '#2a2a2a'],
     jade: ['#06140e', '#0e4a32', '#2ab07a', '#d8ffe8'],
+    woodland: ['#1c1a14', '#3d4a24', '#6e5a3a', '#9a9468'],
+    desert: ['#5a4630', '#8a7250', '#b89e74', '#dcc9a0'],
+    urban: ['#1c1d20', '#4a4d52', '#8a8d92', '#c8cacc'],
+    arctic: ['#56626c', '#96a2ac', '#ccd5db', '#f4f8fa'],
+    jungle: ['#13150b', '#3a4a1a', '#7a8a3a', '#b8b070'],
+    leopard: ['#1a1008', '#6a4418', '#c8963c', '#f0d8a0'],
+    zebra: ['#0d0d0d', '#3a3a3a', '#cfcfcf', '#f6f6f6'],
+    python: ['#1a160e', '#5a4a2a', '#a08a50', '#e2d2a2'],
   };
-  const PAL_OPTS = [['neon', 'Neon'], ['dragon', 'Dragon fire'], ['toxic', 'Toxic'], ['ice', 'Ice'], ['gold', 'Gold'], ['vapor', 'Vaporwave'], ['blood', 'Blood'], ['ocean', 'Ocean'], ['sunset', 'Sunset'], ['royal', 'Royal purple'], ['stealth', 'Stealth + accent'], ['candy', 'Candy'], ['sci', 'Sci-fi white / orange'], ['jade', 'Jade'], ['custom', 'Custom']];
+  const PAL_OPTS = [['neon', 'Neon'], ['dragon', 'Dragon fire'], ['toxic', 'Toxic'], ['ice', 'Ice'], ['gold', 'Gold'], ['vapor', 'Vaporwave'], ['blood', 'Blood'], ['ocean', 'Ocean'], ['sunset', 'Sunset'], ['royal', 'Royal purple'], ['stealth', 'Stealth + accent'], ['candy', 'Candy'], ['sci', 'Sci-fi white / orange'], ['jade', 'Jade'], ['woodland', 'Woodland'], ['desert', 'Desert'], ['urban', 'Urban'], ['arctic', 'Arctic'], ['jungle', 'Jungle'], ['leopard', 'Leopard'], ['zebra', 'Zebra'], ['python', 'Python'], ['custom', 'Custom']];
   const isP = (...l) => (p) => l.includes(p.pattern);
 
   U.register({
     id: 'weapon-skin',
     name: 'Arcade Weapon Skin',
-    desc: 'Tileable abstract gun skins: shards, low-poly, hex, tiger stripes, acid, circuits, glitch, scales with ink, halftone, glow and wear',
+    desc: 'Tileable gun skins: abstract (shards, low-poly, hex, acid, circuits, glitch, scales), camo (woodland, digital, tiger stripe, splinter), animal prints, damask and flames, with pixelation, ink, halftone, glow and wear',
     uses: ['Weapon, knife and gear skins for arcade and competitive shooters: tile them over the UV layout, use the emissive map for glowing accents and the wear mask for worn-off paint.', 'Loud backgrounds for loadout screens, loot cards and stream overlays.'],
     tags: ['Shooter', 'Texturing'],
     tileable: true,
-    normalMap: false,
+    normalMap: true,
+    heightMap: true,
+    normalDesc: 'Normal map from the skin\'s relief: raised paint layers, grooves along the region edges, worn paint and scratches cut below the paint',
+    normalDefaults: { strength: 4, smooth: 0.5 },
     icon: U.icon('<path d="M3 10h13l2-2h3v4h-3l-1 1h-3l-1 3H9l1-3H3z"/><path d="M6 10l2 3M10 10l2 3" opacity=".5"/>'),
     exportLayers: (p) => (p.split ? [{ id: 'color', suffix: 'albedo' }, { id: 'emissive', suffix: 'emissive' }, { id: 'wear', suffix: 'wear' }, { id: 'index', suffix: 'index' }] : null),
     params: [
       { type: 'section', label: 'Pattern' },
       { key: 'pattern', label: 'Pattern', type: 'select', default: 'shards', options: PATTERNS },
       { key: 'scale', label: 'Scale', type: 'int', min: 1, max: 40, default: 6, tip: 'Pattern features across the short side (whole numbers, so it tiles)' },
-      { key: 'angle', label: 'Direction (°)', type: 'range', min: 0, max: 180, step: 1, default: 35, show: isP('stripes'), tip: 'Rounded to whole stripe counts per tile' },
-      { key: 'warp', label: 'Warp', type: 'range', min: 0, max: 2, step: 0.01, default: 0.5, show: isP('stripes', 'fluid', 'topo', 'shards', 'splatter') },
-      { key: 'density', label: 'Density', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, show: isP('circuit', 'glitch', 'splatter', 'hex', 'blocks', 'stripes'), tip: 'Traces, glitch blocks, splats, lit hex cells, block detail or stripe thickness' },
-      { key: 'levels', label: 'Bands', type: 'int', min: 2, max: 12, default: 5, show: isP('fluid', 'topo') },
+      { key: 'angle', label: 'Direction (°)', type: 'range', min: 0, max: 180, step: 1, default: 35, show: isP('stripes', 'zebra'), tip: 'Rounded to whole stripe counts per tile' },
+      { key: 'warp', label: 'Warp', type: 'range', min: 0, max: 2, step: 0.01, default: 0.5, show: isP('stripes', 'fluid', 'topo', 'shards', 'splatter', 'woodland', 'digital', 'tigercamo', 'zebra', 'leopard', 'cheetah', 'giraffe', 'snake', 'flames', 'splinter') },
+      { key: 'density', label: 'Density', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, show: isP('circuit', 'glitch', 'splatter', 'hex', 'blocks', 'stripes', 'woodland', 'digital', 'tigercamo', 'zebra', 'leopard', 'cheetah', 'giraffe'), tip: 'Traces, glitch blocks, splats, lit hex cells, block detail, stripe thickness, camo coverage or spot size' },
+      { key: 'levels', label: 'Bands', type: 'int', min: 2, max: 12, default: 5, show: isP('fluid', 'topo', 'ornate', 'flames') },
+      { key: 'pixelate', label: 'Pixelate', type: 'range', min: 0, max: 32, step: 0.5, default: 0, tip: 'Turns any pattern into a digital (pixel) version: block size in px @ 512, 0 = off. Rounded so whole blocks fit the tile' },
       { key: 'seed', label: 'Seed', type: 'seed', default: 8 },
 
       { type: 'section', label: 'Palette' },
@@ -87,6 +104,10 @@
       { key: 'scratches', label: 'Scratches', type: 'range', min: 0, max: 1, step: 0.01, default: 0.2 },
       { key: 'dirt', label: 'Dirt', type: 'range', min: 0, max: 1, step: 0.01, default: 0.1 },
 
+      { type: 'section', label: 'Relief' },
+      { key: 'layerRelief', label: 'Paint layer height', type: 'range', min: 0, max: 1, step: 0.01, default: 0.35, tip: 'Normal map: each palette color sits a little higher than the darker one below it, facets tilt with their shading' },
+      { key: 'grooves', label: 'Edge grooves', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6, tip: 'Normal map: grooves along the borders between regions (the ink outlines)' },
+      { key: 'wearDepth', label: 'Worn paint depth', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, tip: 'Normal map: worn-off paint and scratches sit below the paint surface' },
       { type: 'section', label: 'Output' },
       { key: 'split', label: 'Separate maps', type: 'bool', default: false, tip: 'Download albedo, emissive, wear mask and palette index map as aligned PNGs' },
       { key: 'view', label: 'Preview map', type: 'select', default: 'color', options: [['color', 'Albedo (combined)'], ['emissive', 'Emissive'], ['wear', 'Wear mask'], ['index', 'Palette index']], tip: 'Preview only' },
@@ -109,12 +130,35 @@
       { name: 'Carbon + gold', group: 'Material', values: { pattern: 'carbon', scale: 24, palette: 'gold', ...pal('gold'), ink: 0, shade: 0.6, glow: 0, flake: 0.5 } },
       { name: 'Stealth carbon', group: 'Material', values: { pattern: 'carbon', scale: 30, palette: 'stealth', ...pal('stealth'), ink: 0, shade: 0.7, glow: 0, flake: 0.2, wear: 0.15 } },
       { name: 'Battle-worn royal', group: 'Material', values: { pattern: 'shards', scale: 7, palette: 'royal', ...pal('royal'), wear: 0.7, edgeWear: 0.8, scratches: 0.7, dirt: 0.4, glow: 0.2, glowColor: '#8a5aff' } },
+      { name: 'Woodland camo', group: 'Camo', values: { pattern: 'woodland', scale: 4, warp: 0.4, density: 0.5, palette: 'woodland', ...pal('woodland'), ink: 0, shade: 0, glow: 0, flake: 0, wear: 0.1, grain: 0.2 } },
+      { name: 'Desert camo', group: 'Camo', values: { pattern: 'woodland', scale: 3, warp: 0.5, density: 0.4, palette: 'desert', ...pal('desert'), ink: 0, shade: 0, glow: 0, flake: 0, wear: 0.1, grain: 0.2, seed: 12 } },
+      { name: 'Digital woodland', group: 'Camo', values: { pattern: 'digital', scale: 4, density: 0.5, palette: 'woodland', ...pal('woodland'), ink: 0, shade: 0, glow: 0, flake: 0, wear: 0.05, grain: 0.1 } },
+      { name: 'Digital urban', group: 'Camo', values: { pattern: 'digital', scale: 5, density: 0.55, palette: 'urban', ...pal('urban'), ink: 0, shade: 0, glow: 0, flake: 0, grain: 0.1, seed: 3 } },
+      { name: 'Digital arctic', group: 'Camo', values: { pattern: 'digital', scale: 4, density: 0.45, palette: 'arctic', ...pal('arctic'), ink: 0, shade: 0, glow: 0, flake: 0, grain: 0.1, seed: 21 } },
+      { name: 'Digital ocean', group: 'Camo', values: { pattern: 'digital', scale: 5, density: 0.5, palette: 'ocean', ...pal('ocean'), ink: 0, shade: 0, glow: 0, flake: 0, grain: 0.1, seed: 31 } },
+      { name: 'Tiger stripe camo', group: 'Camo', values: { pattern: 'tigercamo', scale: 4, warp: 0.4, density: 0.5, palette: 'jungle', ...pal('jungle'), ink: 0, shade: 0, glow: 0, flake: 0, wear: 0.1, grain: 0.2 } },
+      { name: 'Gold tiger stripe', group: 'Camo', values: { pattern: 'tigercamo', scale: 4, warp: 0.5, density: 0.55, palette: 'gold', ...pal('gold'), ink: 0, shade: 0, glow: 0, flake: 0.3, grain: 0.15, seed: 9 } },
+      { name: 'Splinter camo', group: 'Camo', values: { pattern: 'splinter', scale: 4, warp: 0, palette: 'woodland', ...pal('woodland'), ink: 0, shade: 0, glow: 0, flake: 0, grain: 0.15, seed: 6 } },
+      { name: 'Teal splinter', group: 'Camo', values: { pattern: 'splinter', scale: 5, warp: 0, palette: 'ocean', ...pal('ocean'), ink: 1, shade: 0.1, glow: 0, flake: 0, grain: 0.1, seed: 14 } },
+      { name: 'Digital splinter', group: 'Camo', values: { pattern: 'splinter', scale: 4, warp: 0, pixelate: 8, palette: 'urban', ...pal('urban'), ink: 0, shade: 0, glow: 0, flake: 0, grain: 0.1, seed: 2 } },
+      { name: 'Zebra', group: 'Animal', values: { pattern: 'zebra', scale: 8, angle: 80, warp: 0.4, density: 0.5, palette: 'zebra', ...pal('zebra'), ink: 0, shade: 0, glow: 0, flake: 0, grain: 0.1 } },
+      { name: 'Neon zebra', group: 'Animal', values: { pattern: 'zebra', scale: 6, angle: 75, warp: 0.7, density: 0.5, palette: 'vapor', ...pal('vapor'), ink: 0, shade: 0, glow: 0.3, glowColor: '#ff5fd2', flake: 0.2, grain: 0.1, seed: 4 } },
+      { name: 'Leopard', group: 'Animal', values: { pattern: 'leopard', scale: 6, warp: 0.4, density: 0.5, palette: 'leopard', ...pal('leopard'), ink: 0, shade: 0, glow: 0, flake: 0, grain: 0.15 } },
+      { name: 'Cyan leopard', group: 'Animal', values: { pattern: 'leopard', scale: 7, warp: 0.4, density: 0.5, palette: 'ice', ...pal('ice'), ink: 0, shade: 0, glow: 0, flake: 0.3, grain: 0.1, seed: 11 } },
+      { name: 'Cheetah', group: 'Animal', values: { pattern: 'cheetah', scale: 10, warp: 0.3, density: 0.5, palette: 'leopard', ...pal('leopard'), ink: 0, shade: 0, glow: 0, flake: 0, grain: 0.15 } },
+      { name: 'Giraffe', group: 'Animal', values: { pattern: 'giraffe', scale: 5, warp: 0.3, density: 0.4, palette: 'leopard', ...pal('leopard'), ink: 0, shade: 0, glow: 0, flake: 0, grain: 0.15 } },
+      { name: 'Python', group: 'Animal', values: { pattern: 'snake', scale: 4, warp: 0.4, palette: 'python', ...pal('python'), ink: 0.6, inkColor: '#1a140c', shade: 0.4, glow: 0, flake: 0.15, grain: 0.1 } },
+      { name: 'Toxic python', group: 'Animal', values: { pattern: 'snake', scale: 4, warp: 0.5, palette: 'toxic', ...pal('toxic'), ink: 0.6, shade: 0.4, glow: 0.2, glowColor: '#9aff1a', flake: 0.2, grain: 0.1, seed: 5 } },
+      { name: 'Ornate damask', group: 'Motif', values: { pattern: 'ornate', scale: 4, levels: 4, palette: 'royal', ...pal('royal'), ink: 1, shade: 0.2, glow: 0, flake: 0.4, grain: 0.1 } },
+      { name: 'Silver filigree', group: 'Motif', values: { pattern: 'ornate', scale: 5, levels: 3, palette: 'urban', ...pal('urban'), ink: 0.8, shade: 0.3, glow: 0, flake: 0.6, grain: 0.1, seed: 7 } },
+      { name: 'Hellfire', group: 'Motif', values: { pattern: 'flames', scale: 3, warp: 0.3, levels: 5, palette: 'dragon', ...pal('dragon'), ink: 1, shade: 0, glow: 0.4, glowColor: '#ff7a12', flake: 0, grain: 0.1 } },
+      { name: 'Blue flames', group: 'Motif', values: { pattern: 'flames', scale: 3, warp: 0.3, levels: 5, palette: 'ice', ...pal('ice'), ink: 1, shade: 0, glow: 0.4, glowColor: '#8ad8ff', flake: 0, grain: 0.1, seed: 19 } },
       { name: 'Factory new gold', group: 'Material', values: { pattern: 'triangles', scale: 5, palette: 'gold', ...pal('gold'), palMode: 'ramp', ink: 0.6, shade: 0.7, flake: 0.8, glow: 0, wear: 0, scratches: 0, dirt: 0 } },
     ],
 
     render(ctx, W, H, p, opts) {
       opts = opts || {};
-      const layer = opts.layer || (opts.preview ? p.view || 'color' : 'color');
+      const layer = opts.height ? 'height' : opts.layer || (opts.preview ? p.view || 'color' : 'color');
       const S = Math.min(W, H), k = S / 512, seed = p.seed | 0, N = W * H, ar = H / W;
       const per = (f) => [Math.max(1, Math.round((f * W) / S)), Math.max(1, Math.round((f * H) / S))];
       const sc = Math.max(1, p.scale | 0), [px, py] = per(sc), pat = p.pattern;
@@ -124,7 +168,7 @@
 
       // warp fields (tileable), in lattice units
       let WX = null, WY = null;
-      if (p.warp > 0 && ['stripes', 'fluid', 'topo', 'shards', 'splatter'].includes(pat)) {
+      if (p.warp > 0 && ['stripes', 'fluid', 'topo', 'shards', 'splatter', 'woodland', 'digital', 'tigercamo', 'zebra', 'leopard', 'cheetah', 'giraffe', 'snake', 'flames', 'splinter'].includes(pat)) {
         const [qx, qy] = per(Math.max(1, Math.round(sc / 2)));
         WX = U.coarseField(W, H, 180, (x, y) => U.fractal('perlin', (x / W) * qx, (y / H) * qy, qx, qy, 3, 0.5, 'fbm', seed + 1) - 0.5);
         WY = U.coarseField(W, H, 180, (x, y) => U.fractal('perlin', (x / W) * qx, (y / H) * qy, qx, qy, 3, 0.5, 'fbm', seed + 2) - 0.5);
@@ -168,9 +212,20 @@
       const hs = Math.max(2, p.halfSize * k), hn = Math.max(1, Math.round(W / hs / Math.SQRT2)), hm = Math.max(1, Math.round(H / hs / Math.SQRT2));
       const scanN = Math.max(1, Math.round(H / Math.max(2, 3 * k)));
 
+      // camo / animal / motif helpers
+      const nz = (uu, vv, fx, fy, oct, sd, mode) => U.fractal('perlin', uu * fx, vv * fy, fx, fy, oct, 0.5, mode || 'fbm', seed + sd);
+      const iy = (f) => Math.max(1, Math.round(f));
+      const featPx = S / sc; // px per pattern feature
+      const VL = { id: 0, e: 0, es: 0, f1: 0, ci: 0, cj: 0, px: 0, py: 0 };
+      // pixelate: whole blocks per tile; each block samples the pattern at its center
+      const pix = p.pixelate > 0, pbx = pix ? Math.max(2, Math.round(W / (p.pixelate * k))) : W, pby = pix ? Math.max(2, Math.round(H / (p.pixelate * k))) : H;
+
       const img = ctx.createImageData(W, H), o = img.data;
-      for (let y = 0, i = 0; y < H; y++) {
-        for (let x = 0; x < W; x++, i++) {
+      for (let yy = 0, i0p = 0; yy < H; yy++) {
+        for (let xx = 0; xx < W; xx++, i0p++) {
+          const x = pix ? Math.min(W - 1, Math.floor((Math.floor((xx * pbx) / W) + 0.5) * W / pbx)) : xx;
+          const y = pix ? Math.min(H - 1, Math.floor((Math.floor((yy * pby) / H) + 0.5) * H / pby)) : yy;
+          const i = y * W + x;
           const u = (x + 0.5) / W, v = (y + 0.5) / H;
           let U0 = u, V0 = v;
           if (WX) { U0 += (WX[i] * p.warp) / px; V0 += (WY[i] * p.warp) / py; }
@@ -297,6 +352,108 @@
               sh = (fy < 0.15 ? 0.4 : fy > 0.85 ? -0.4 : 0) * size;
               break;
             }
+            case 'woodland':
+            case 'digital': {
+              // layered blotches: each layer claims the area above its threshold (wider than tall)
+              let uu = U0, vv = V0;
+              if (pat === 'digital') { const qx = px * 10, qy = py * 10; uu = (Math.floor(u * qx) + 0.5) / qx; vv = (Math.floor(v * qy) + 0.5) / qy; }
+              const fy2 = iy(py * 1.6), cov = (dens - 0.5) * 0.12;
+              const n1 = nz(uu, vv, px, fy2, 4, 81), n2 = nz(uu, vv, px, fy2, 4, 82), n3 = nz(uu, vv, px * 2, fy2 * 2, 3, 83);
+              const t1 = 0.5 - cov, t2 = 0.55 - cov, t3 = 0.62 - cov;
+              t = 0.87; e = Math.abs(n1 - t1);
+              if (n1 > t1) { t = 0.62; e = Math.min(e, n1 - t1); }
+              if (n2 > t2) { t = 0.37; e = Math.min(Math.abs(n2 - t2), e); }
+              if (n3 > t3) { t = 0.08; e = Math.min(Math.abs(n3 - t3), e); }
+              e = pat === 'digital' ? 1e9 : e * featPx * 0.9;
+              break;
+            }
+            case 'tigercamo': {
+              // military tiger stripe: two light base tones, horizontal jagged brush strokes in two dark tones
+              const jag = (nz(U0, V0, px * 8, py * 8, 2, 92) - 0.5) * 0.09;
+              const sA = nz(U0, V0, px, iy(py * 4), 4, 91) + jag, sB = nz(U0, V0, iy(px * 1.3), iy(py * 5), 4, 93) + jag;
+              const ta = 0.63 - dens * 0.12, tb = 0.6 - dens * 0.1;
+              t = slow[i] > 0.5 ? 0.87 : 0.62; e = 1e9;
+              if (sB > tb) { t = 0.36; e = (sB - tb) * featPx * 0.5; }
+              if (sA > ta) { t = 0.06; e = (sA - ta) * featPx * 0.5; }
+              break;
+            }
+            case 'splinter': {
+              // long, sheared cells: angular splinters with straight edges
+              const shx = 1, nxs = px, nys = py * 3;
+              U.voro((U0 + shx * V0) * nxs, V0 * nys, nxs, nys, seed + 111, 1, false, W / nxs, H / nys, 0, VL);
+              const q = hash(VL.ci, VL.cj, seed + 112) * 0.6 + slow[i] * 0.4;
+              t = (Math.floor(q * 4) + 0.5) / 4; e = VL.e;
+              break;
+            }
+            case 'zebra': {
+              const ph = kx * U0 + ky * V0 + (nz(U0, V0, px * 2, py * 2, 3, 101) - 0.5) * 1.1;
+              const sn = Math.sin(TAU * ph), th = (slow[i] - 0.5) * 0.7 - (dens - 0.5) * 0.9;
+              const band = U.mod(Math.floor(ph * 2 + (sn > th ? 0.5 : 0)), 1000), alt = hash(band, 1, seed + 102) < 0.35;
+              t = sn > th ? (alt ? 0.3 : 0.04) : (alt ? 0.7 : 0.96);
+              const grad = TAU * kLen / S;
+              e = Math.abs(sn - th) / Math.max(1e-4, grad * Math.sqrt(Math.max(0.05, 1 - sn * sn)));
+              break;
+            }
+            case 'leopard':
+            case 'cheetah': {
+              const f2 = px, g2 = py;
+              U.voro(U0 * f2, V0 * g2, f2, g2, seed + 121, 1, false, 1, 1, 0, VL);
+              const ns = (nz(U0, V0, px * 8, py * 8, 2, 122) - 0.5) * 0.14, d = VL.f1 + ns;
+              const r0 = (0.24 + hash(VL.ci, VL.cj, seed + 123) * 0.1) * (0.7 + dens * 0.6), cp = W / f2;
+              t = slow[i] > 0.55 ? 0.82 : 0.9; e = 1e9;
+              if (pat === 'cheetah') {
+                const rr = r0 * 0.7;
+                if (d < rr) t = 0.04;
+                e = Math.abs(d - rr) * cp;
+              } else {
+                const ang = Math.atan2(V0 * g2 - VL.py, U0 * f2 - VL.px), gap = Math.sin(ang * 3 + hash(VL.ci, VL.cj, seed + 124) * 6) > 0.55;
+                const rin = r0 - 0.1;
+                if (d < rin) { t = 0.55; e = (rin - d) * cp; }
+                else if (d < r0 && !gap) { t = 0.04; e = Math.min(d - rin, r0 - d) * cp; }
+                else e = Math.abs(d - r0) * cp;
+              }
+              break;
+            }
+            case 'giraffe': {
+              const f2 = Math.round(px * 1.5), g2 = Math.round(py * 1.5);
+              U.voro(U0 * f2, V0 * g2, f2, g2, seed + 131, 1, false, W / f2, H / g2, 0, VL);
+              const bw = (W / f2) * 0.09 * (0.5 + dens), ee = VL.e + (nz(U0, V0, px * 6, py * 6, 2, 132) - 0.5) * bw * 1.4;
+              t = ee < bw ? 0.94 : 0.22 + hash(VL.ci, VL.cj, seed + 133) * 0.3; e = Math.abs(ee - bw);
+              break;
+            }
+            case 'snake': {
+              // python: small overlapping scales over big saddle blotches with light outlines
+              const sx = px * 6, sy = py * 8;
+              U.voro(u * sx, v * sy, sx, sy, seed + 141, 0.15, true, W / sx, H / sy, 0, VL);
+              const n = nz(U0, V0, px, py, 4, 142) + (hash(VL.ci, VL.cj, seed + 143) - 0.5) * 0.05;
+              t = n > 0.6 ? 0.07 : n > 0.53 ? 0.93 : n < 0.36 ? 0.5 : 0.68;
+              e = VL.e; sh = 0.4 - VL.f1 / (W / sx) * 1.2;
+              break;
+            }
+            case 'ornate': {
+              // damask: a mirrored (8-fold) noise motif per staggered cell, cut into bands
+              const X = u * px, row = Math.floor(v * py), Xs = X + (U.mod(row, 2) ? 0.5 : 0), ci = Math.floor(Xs);
+              let ax = Math.abs(Xs - ci - 0.5), ay = Math.abs(v * py - row - 0.5);
+              if (ay > ax) { const tt = ax; ax = ay; ay = tt; }
+              const r = Math.hypot(ax, ay), th = Math.atan2(ay, ax);
+              const motif = U.fractal('perlin', ax * 4 + 3.1, ay * 4 + 1.7, 0, 0, 3, 0.5, 'fbm', seed + 161) * 0.65 + (0.5 + 0.5 * Math.cos(th * 8)) * (1 - smoothstep(0.1, 0.4, r)) * 0.45;
+              const L = Math.max(2, p.levels | 0), q = motif * L, fq = q - Math.floor(q);
+              t = clamp((Math.floor(q) + 0.5) / L); e = Math.min(fq, 1 - fq) * featPx * 0.25;
+              sh = (motif - 0.5) * 0.6;
+              break;
+            }
+            case 'flames': {
+              // rows of rising flame tongues: each row's flames climb from its bottom to a ridged, wavy height
+              const rows = Math.max(1, py), yy = V0 * rows + (nz(U0, V0, px * 2, py * 2, 3, 172) - 0.5) * 0.35;
+              const ri = Math.floor(yy), fr = yy - ri, rr = U.mod(ri, rows);
+              const tongue = U.fractal('perlin', U0 * px * 3 + (1 - fr) * 0.6 * (hash(rr, 1, seed + 173) - 0.5), rr * 1.37 + 0.5, px * 3, 0, 3, 0.55, 'ridged', seed + 171);
+              const top = 1 - (0.25 + tongue * 0.75);             // flame top within the row (0 = row top)
+              const inside = (fr - top) / Math.max(0.05, 1 - top); // 0 at the flame edge, 1 at its base
+              const L = Math.max(2, p.levels | 0);
+              if (inside <= 0) { t = 0.04; e = -inside * (H / rows) * (1 - top); }
+              else { const q = inside * L, fq = q - Math.floor(q); t = clamp((Math.floor(q) + 1) / (L + 0.5)); e = Math.min(fq, 1 - fq) * (H / rows) * 0.5 / L * 4; gl = inside > 0.6 ? 1 : 0; }
+              break;
+            }
             case 'carbon': {
               // 2×2 twill weave: tows alternate direction per cell, fibres along the tow
               const X = u * px * 2, Y = v * py * 2, ci = Math.floor(X), cj = Math.floor(Y), fx = X - ci, fy = Y - cj;
@@ -353,7 +510,16 @@
           }
           if (dirtF) { const d = smoothstep(0.5, 0.85, dirtF[i]) * p.dirt * 0.6; r *= 1 - d; g *= 1 - d * 1.02; b *= 1 - d * 1.08; }
 
-          const k4 = i * 4;
+          const k4 = i0p * 4;
+          if (layer === 'height') {
+            // relief: paint layers step up with the palette index, facets tilt, grooves follow the region borders,
+            // worn paint and scratches go down to the metal
+            const gw2 = Math.max(1.2 * k, inkW * 0.6 + k);
+            const groove = e < 1e8 ? 1 - smoothstep(0, gw2, e) : 0;
+            const hv = 0.55 + (idx - 0.5) * p.layerRelief * 0.3 + (sh || 0) * p.layerRelief * 0.08 - groove * p.grooves * 0.3 - wm * p.wearDepth * 0.25;
+            o[k4] = o[k4 + 1] = o[k4 + 2] = clamp(hv) * 255; o[k4 + 3] = 255;
+            continue;
+          }
           if (layer === 'emissive') { const ee = emis * (1 - wm); o[k4] = glowC[0] * ee; o[k4 + 1] = glowC[1] * ee; o[k4 + 2] = glowC[2] * ee; }
           else if (layer === 'wear') { o[k4] = o[k4 + 1] = o[k4 + 2] = wm * 255; }
           else if (layer === 'index') { o[k4] = o[k4 + 1] = o[k4 + 2] = idx * 255; }

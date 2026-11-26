@@ -199,7 +199,7 @@
     name: 'Birds & Bats',
     desc: 'Distant birds and bats as looping wing-flap tilesheets: crows, gulls, swallows, raptors and bats seen from below or above',
     uses: ['Flock and ambient wildlife particles for skies, horror scenes and landscapes, e.g. circling crows, seagulls over the coast or bats at night.', 'Small animated flying-creature sprites for 2D games and backgrounds; the white + alpha output can be tinted in the engine.'],
-    tags: ['Nature', 'VFX', 'Horror'],
+    tags: ['Nature', 'VFX', 'Horror', 'Animation'],
     bg: 'checker',
     animLoop: true,
     animate(p, f) { p.time = (p.time || 0) + f.t; return p; },

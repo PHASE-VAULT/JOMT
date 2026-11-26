@@ -87,7 +87,7 @@
     name: 'Insects & Spiders',
     desc: 'Top-down spiders, beetles, flies, butterflies, ants and more with shading, normal map and looping animation',
     uses: ['Small creature sprites and decals for horror, survival and nature games, e.g. bugs crawling on walls, floors or corpses.', 'Icons and illustrations for collection screens, field guides and educational apps.'],
-    tags: ['Horror', 'Decals', 'Nature'],
+    tags: ['Horror', 'Decals', 'Nature', 'Animation'],
     bg: 'checker',
     fixedAspect: '1:1',
     normalMap: true,

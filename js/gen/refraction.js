@@ -79,6 +79,34 @@
       { name: 'Water surface (calm)', group: 'VFX', values: { pattern: 'wavy', scale: 4, octaves: 4, warp: 0.4, strength: 0.6 } },
       { name: 'Fresnel lens', group: 'VFX', values: { pattern: 'fresnel', scale: 14, strength: 0.9 } },
       { name: 'Shower door (pebbles + frost)', group: 'Architectural', values: { pattern: 'pebbled', scale: 30, sharp: 0.3, frost: 0.4, frostScale: 96, strength: 0.7 } },
+      // glass styles: reeded variants
+      { name: 'Fine reeded (narrow ribs)', group: 'Reeded & fluted', values: { pattern: 'reeded', scale: 30, sharp: 0.1, warp: 0.02, strength: 0.8 } },
+      { name: 'Bold reeded (wide ribs)', group: 'Reeded & fluted', values: { pattern: 'reeded', scale: 5, sharp: 0.2, warp: 0.03, strength: 1.3 } },
+      { name: 'Horizontal reeded', group: 'Reeded & fluted', values: { pattern: 'reeded', scale: 14, angle: 90, warp: 0.04 } },
+      { name: 'Diagonal fluted', group: 'Reeded & fluted', values: { pattern: 'reeded', scale: 16, angle: 45, concave: true, sharp: 0.1, warp: 0.03 } },
+      { name: 'Satin reeded (frosted ribs)', group: 'Reeded & fluted', values: { pattern: 'reeded', scale: 14, warp: 0.03, frost: 0.45, frostScale: 120 } },
+      { name: 'Sharp prism ribs', group: 'Reeded & fluted', values: { pattern: 'reeded', scale: 10, sharp: 0.9, warp: 0.02, strength: 1.4 } },
+      // glass styles: etched, frosted and obscure (privacy) glass
+      { name: 'Satin acid-etched', group: 'Etched & obscure', values: { pattern: 'frosted', scale: 150, octaves: 2, warp: 0, strength: 0.5 } },
+      { name: 'Deep sandblasted', group: 'Etched & obscure', values: { pattern: 'frosted', scale: 48, octaves: 5, warp: 0, strength: 1.1, frost: 0.5, frostScale: 140 } },
+      { name: 'Stippolyte (obscure)', group: 'Etched & obscure', values: { pattern: 'hammered', scale: 18, sharp: 0.45, jitter: 1, warp: 0.4, strength: 1.1 } },
+      { name: 'Chinchilla (faceted obscure)', group: 'Etched & obscure', values: { pattern: 'crackle', scale: 22, jitter: 1, sharp: 0.55, gap: 0.6, warp: 0.35, strength: 1.5 } },
+      { name: 'Arctic / ripple-line obscure', group: 'Etched & obscure', values: { pattern: 'rippled', scale: 11, angle: 0, sharp: 0.6, warp: 1.2, strength: 0.9 } },
+      { name: 'Hammered + frost', group: 'Etched & obscure', values: { pattern: 'hammered', scale: 12, sharp: 0.1, jitter: 0.9, warp: 0.25, concave: true, frost: 0.35, frostScale: 110 } },
+      { name: 'Pressed diamond glass', group: 'Decorative & antique', values: { pattern: 'pebbled', scale: 16, jitter: 0, sharp: 0.6, warp: 0.03, strength: 1.1 } },
+      // glass styles: decorative, antique and art glass
+      { name: 'Heavy cathedral glass', group: 'Decorative & antique', values: { pattern: 'rippled', scale: 5, angle: 20, sharp: 0.4, warp: 1, strength: 1.3 } },
+      { name: 'Hand-blown antique (crown)', group: 'Decorative & antique', values: { pattern: 'wavy', scale: 5, octaves: 4, warp: 1, strength: 0.55 } },
+      { name: 'Bullseye crown glass', group: 'Decorative & antique', values: { pattern: 'fresnel', scale: 5, strength: 1.3 } },
+      { name: 'Seeded glass (tiny bubbles)', group: 'Decorative & antique', values: { pattern: 'wavy', scale: 3, octaves: 3, warp: 0.5, strength: 0.4, drops: 0.7, dropSize: 0.12, dropVar: 0.9, trails: 0 } },
+      { name: 'Wavy glass blocks', group: 'Decorative & antique', values: { pattern: 'blocks', scale: 4, gap: 4, rings: 6, warp: 0.35, strength: 1.1 } },
+      { name: 'Clear square glass blocks', group: 'Decorative & antique', values: { pattern: 'blocks', scale: 3, gap: 7, rings: 0, warp: 0.02, strength: 1 } },
+      // glass styles: damage, ice and effects
+      { name: 'Cracked windshield (laminated)', group: 'Damage', values: { pattern: 'crackle', scale: 30, jitter: 1, sharp: 0.7, gap: 0.6, warp: 0.15, strength: 1.6 } },
+      { name: 'Frozen window', group: 'Damage', values: { pattern: 'crackle', scale: 10, jitter: 1, sharp: 0.2, gap: 2, warp: 0.8, frost: 0.6, frostScale: 90, strength: 0.9 } },
+      { name: 'Foggy, wiped glass', group: 'Weather', values: { pattern: 'frosted', scale: 70, octaves: 2, warp: 0, strength: 0.35, drops: 0.5, dropSize: 0.15, dropVar: 0.7, trails: 0.1, smudge: 0.8 } },
+      { name: 'Frosted lighthouse lens', group: 'VFX', values: { pattern: 'fresnel', scale: 20, strength: 0.9, frost: 0.3, frostScale: 100 } },
+      { name: 'Sci-fi energy glass', group: 'VFX', values: { pattern: 'heat', scale: 6, octaves: 3, warp: 1.4, strength: 0.7, frost: 0.15, frostScale: 140 } },
     ],
 
     render(ctx, W, H, p, opts) {

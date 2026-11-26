@@ -249,7 +249,7 @@
 
   /* trail layout in print lengths: [{ x, y, a, mirror, fade, kind, scale }] */
   function layout(p, rnd) {
-    const K = KINDS[p.kind] || KINDS.boot, out = [], n = p.layout === 'single' ? 1 : Math.max(1, p.count);
+    const K = KINDS[p.kind] || KINDS.boot, out = [], n = single(p) ? 1 : Math.max(1, p.count | 0);
     const turn = p.curve * 140 * RAD, sc = p.scatter, va = p.variation;
     let h = p.direction * RAD - turn / 2, x = 0, y = 0;
     for (let i = 0; i < n; i++) {
@@ -271,6 +271,9 @@
   }
 
   const anyTread = (p) => p.kind === 'boot' || p.kind === 'sneaker';
+  // one print: the single layout, or a trail of just one step
+  const single = (p) => p.layout === 'single' || (p.count | 0) <= 1;
+  const trail = (p) => !single(p);
   U.register({
     id: 'footprints',
     name: 'Footprints',
@@ -286,17 +289,17 @@
       { key: 'tread', label: 'Tread', type: 'select', default: 'lug', options: [['lug', 'Lug blocks'], ['chevron', 'Chevrons'], ['waves', 'Waves'], ['grid', 'Grid'], ['hex', 'Hex cells'], ['none', 'Smooth']], show: anyTread },
       { key: 'detail', label: 'Detail', type: 'range', min: 0, max: 1, step: 0.01, default: 0.85, show: anyTread, tip: 'How crisply the tread pattern shows' },
       { key: 'layout', label: 'Layout', type: 'select', default: 'trail', options: [['trail', 'Trail'], ['single', 'Single print']] },
-      { key: 'foot', label: 'Foot side', type: 'select', default: 'right', options: [['right', 'Right'], ['left', 'Left']], show: (p) => p.layout === 'single' },
-      { key: 'count', label: 'Steps', type: 'int', min: 2, max: 30, default: 4, show: (p) => p.layout === 'trail' },
-      { key: 'stride', label: 'Step length', type: 'range', min: 0.5, max: 5, step: 0.05, default: 2.2, show: (p) => p.layout === 'trail', tip: 'Distance between steps, in print lengths' },
-      { key: 'gait', label: 'Gait width', type: 'range', min: 0, max: 2, step: 0.01, default: 1.3, show: (p) => p.layout === 'trail', tip: 'Left / right offset of the steps, in print widths' },
-      { key: 'curve', label: 'Path curvature', type: 'range', min: -1, max: 1, step: 0.01, default: 0, show: (p) => p.layout === 'trail' },
+      { key: 'foot', label: 'Foot side', type: 'select', default: 'right', options: [['right', 'Right'], ['left', 'Left']], show: single },
+      { key: 'count', label: 'Steps', type: 'int', min: 1, max: 30, default: 4, show: (p) => p.layout === 'trail', tip: '1 = a single footprint' },
+      { key: 'stride', label: 'Step length', type: 'range', min: 0.5, max: 5, step: 0.05, default: 2.2, show: trail, tip: 'Distance between steps, in print lengths' },
+      { key: 'gait', label: 'Gait width', type: 'range', min: 0, max: 2, step: 0.01, default: 1.3, show: trail, tip: 'Left / right offset of the steps, in print widths' },
+      { key: 'curve', label: 'Path curvature', type: 'range', min: -1, max: 1, step: 0.01, default: 0, show: trail },
       { key: 'direction', label: 'Direction', type: 'range', min: -180, max: 180, step: 1, default: -90, tip: 'Walking direction (-90 = up); rotates a single print' },
       { key: 'size', label: 'Print size', type: 'range', min: 0.03, max: 0.95, step: 0.005, default: 0.2, tip: 'Print length relative to the texture; a fitted trail shrinks it when needed' },
-      { key: 'fit', label: 'Fit trail into texture', type: 'bool', default: true, show: (p) => p.layout === 'trail', tip: 'Off: the trail keeps the print size and may run off the edges' },
+      { key: 'fit', label: 'Fit trail into texture', type: 'bool', default: true, show: trail, tip: 'Off: the trail keeps the print size and may run off the edges' },
       { key: 'scatter', label: 'Scatter', type: 'range', min: 0, max: 1, step: 0.01, default: 0.2, tip: 'Random offset and rotation per print' },
       { key: 'variation', label: 'Variation', type: 'range', min: 0, max: 1, step: 0.01, default: 0.3, tip: 'Size, depth and partial prints vary per step' },
-      { key: 'fade', label: 'Fade along trail', type: 'range', min: 0, max: 1, step: 0.01, default: 0.3, show: (p) => p.layout === 'trail', tip: 'Later prints get fainter (and break up for blood, ink and wet prints)' },
+      { key: 'fade', label: 'Fade along trail', type: 'range', min: 0, max: 1, step: 0.01, default: 0.3, show: trail, tip: 'Later prints get fainter (and break up for blood, ink and wet prints)' },
       { key: 'smear', label: 'Slip / smear', type: 'range', min: 0, max: 1, step: 0.01, default: 0, tip: 'Prints dragged backwards a little, like slipping' },
       { key: 'seed', label: 'Seed', type: 'seed', default: 5 },
 
@@ -352,7 +355,7 @@
       for (const q of prints) { x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); }
       const ext = 0.62; // print half extent around its center, in lengths
       let L = L0;
-      if (p.layout === 'trail' && p.fit) L = Math.min(L0, (W * 0.94) / (x1 - x0 + ext * 2), (H * 0.94) / (y1 - y0 + ext * 2));
+      if (trail(p) && p.fit) L = Math.min(L0, (W * 0.94) / (x1 - x0 + ext * 2), (H * 0.94) / (y1 - y0 + ext * 2));
       const ox = W / 2 - ((x0 + x1) / 2) * L, oy = H / 2 - ((y0 + y1) / 2) * L;
 
       /* 2. depth canvas: R = depth, G = fade */

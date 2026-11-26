@@ -6,13 +6,20 @@
   /* ---------- registry ---------- */
   U.generators = [];
   U.register = (g) => {
-    // every preset list starts with the generator's own defaults
-    if (g.presets) g.presets.unshift({ name: 'Default', group: 'Default', aspect: g.aspect || '1:1', values: {} });
+    // every preset list starts with the generator's own defaults, unless one of its presets already is
+    // exactly that (empty values): then that preset is the default and stepping never shows the same look twice
+    if (g.presets) {
+      const own = g.presets.findIndex((p) => !Object.keys(p.values || {}).length && (!p.aspect || p.aspect === (g.aspect || '1:1')));
+      if (own < 0) g.presets.unshift({ name: 'Default', group: 'Default', aspect: g.aspect || '1:1', values: {} });
+      else if (own > 0) g.presets.unshift(g.presets.splice(own, 1)[0]);
+    }
     U.generators.push(g);
   };
   U.getGen = (id) => U.generators.find((g) => g.id === id);
-  // filter tags, in display order; each generator lists up to 3 of them in `tags`
-  U.TAGS = ['Horror', 'PBR', 'Texturing', 'UI', 'Shooter', 'Military', 'VFX', 'Lighting', 'Nature', 'Decals', 'Vehicles', 'Sci-fi'];
+  // name of the preset a fresh tab starts on (the generator's defaults)
+  U.defaultPreset = (g) => (g && g.presets && g.presets.length ? g.presets[0].name : null);
+  // filter tags, in display order; each generator lists up to 3 of them in `tags`, plus 'Animation' when it has a tilesheet (animate)
+  U.TAGS = ['Horror', 'PBR', 'Texturing', 'UI', 'Shooter', 'Military', 'VFX', 'Animation', 'Lighting', 'Nature', 'Decals', 'Vehicles', 'Sci-fi'];
 
   /* ---------- math ---------- */
   const clamp = (v, a = 0, b = 1) => (v < a ? a : v > b ? b : v);

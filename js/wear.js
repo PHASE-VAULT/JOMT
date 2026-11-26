@@ -63,7 +63,7 @@
 
   /* a W×H field from fn(x, y), evaluated on a grid of ~200 cells per short side and interpolated
      bilinearly: the noise is the same at every resolution (preview = export) and fast to compute */
-  function field(W, H, S, fn) {
+  function fieldAt(W, H, S, fn) {
     const st = Math.max(1, S / 200), gw = Math.ceil(W / st) + 2, gh = Math.ceil(H / st) + 2;
     const g = new Float32Array(gw * gh);
     for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) g[j * gw + i] = fn(i * st, j * st);
@@ -86,9 +86,12 @@
 
   /* precompute the noise fields once per render; reused for every layer / component.
      `silhouette` (optional canvas): the whole object's shape; edge wear follows its outline, so
-     separately rendered parts (a thin border, the fill) wear along the same, real edges. */
-  U.wearFields = (W, H, p, S, silhouette) => {
+     separately rendered parts (a thin border, the fill) wear along the same, real edges.
+     `ox`, `oy` (optional): the W×H area is a crop at this offset inside a larger texture; the noise is
+     sampled at the texture position, so a cropped part wears like the same spot of the full image. */
+  U.wearFields = (W, H, p, S, silhouette, ox, oy) => {
     const seed = p.seed | 0, F = { W, H, S };
+    const field = ox || oy ? (w, h, s, fn) => fieldAt(w, h, s, (x, y) => fn(x + (ox || 0), y + (oy || 0))) : fieldAt;
     if (p.distort > 0) {
       const ds = p.distortScale / S, amp = p.distort * S * 0.06;
       F.wx = field(W, H, S, (x, y) => (U.fractal('perlin', x * ds, y * ds, 0, 0, 3, 0.5, 'fbm', seed + 101) - 0.5) * 2 * amp);

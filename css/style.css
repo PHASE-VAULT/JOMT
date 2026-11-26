@@ -793,6 +793,8 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: 3px; }
 /* ---------- texture / normal map switch ---------- */
 .mode-bar { padding: 10px 14px; border-bottom: 1px solid var(--line); }
 .mode-bar[hidden] { display: none; }
+.mode-bar .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+.mode-bar .seg button { padding: 6px 4px; }
 
 /* ---------- preset bar ---------- */
 .preset-bar {

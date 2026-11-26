@@ -77,7 +77,7 @@
     name: 'Fire',
     desc: 'Looping flame tilesheets: realistic rising fire with embers or toon / pixel flames, seamless in time',
     uses: ['Looping flipbook textures for campfires, torches, candles, burning ground and magic fire in game particle systems.', 'Animated fire sprites for 2D games, pixel-art scenes and UI effects.'],
-    tags: ['VFX', 'Nature'],
+    tags: ['VFX', 'Nature', 'Animation'],
     bg: 'black',
     animLoop: true,
     animate(p, f) { p.time = (p.time || 0) + f.t; return p; },

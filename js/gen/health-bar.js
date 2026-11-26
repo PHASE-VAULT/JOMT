@@ -9,18 +9,21 @@
 
   function geometry(W, H, p) {
     const S = Math.min(W, H), k = S / 64, m = p.margin * k, horiz = W >= H;
-    const L = (horiz ? W : H) - 2 * m, T = (horiz ? H : W) - 2 * m;
+    // available space minus the margin, then the bar's own length and thickness, centered in it
+    const LA = (horiz ? W : H) - 2 * m, TA = (horiz ? H : W) - 2 * m;
+    const L = Math.max(1, LA * U.clamp(p.barLen == null ? 1 : p.barLen, 0.05, 1)), T = Math.max(1, TA * U.clamp(p.barThick == null ? 1 : p.barThick, 0.02, 1));
+    const ml = m + (LA - L) / 2, mt = m + (TA - T) / 2; // offsets along / across
     const sk = p.skew * T, Le = Math.max(1, L - Math.abs(sk));
     const off = (v) => (sk >= 0 ? sk * (1 - v / T) : -sk * (v / T));
     // bar space (u along from the fill start side, v across from the top / left) -> canvas
     const flip = p.dir === 'end';
     const map = (u, v) => {
       const uu = flip ? Le - u : u;
-      return horiz ? [m + uu + off(v), m + v] : [m + v, H - m - uu - off(v)];
+      return horiz ? [ml + uu + off(v), mt + v] : [mt + v, H - ml - uu - off(v)];
     };
     const unmap = (x, y) => {
-      const v = horiz ? y - m : x - m;
-      const uu = horiz ? x - m - off(v) : H - m - y - off(v);
+      const v = horiz ? y - mt : x - mt;
+      const uu = horiz ? x - ml - off(v) : H - ml - y - off(v);
       return flip ? Le - uu : uu;
     };
     const r = p.radius * T;
@@ -61,7 +64,7 @@
         return g;
       },
       across: (c, stops) => {
-        const g = horiz ? c.createLinearGradient(0, m, 0, m + T) : c.createLinearGradient(m, 0, m + T, 0);
+        const g = horiz ? c.createLinearGradient(0, mt, 0, mt + T) : c.createLinearGradient(mt, 0, mt + T, 0);
         for (const [t, col] of stops) g.addColorStop(t, col);
         return g;
       },
@@ -82,6 +85,8 @@
     params: [
       { type: 'section', label: 'Shape' },
       { key: 'value', label: 'Fill amount (preview)', type: 'range', min: 0, max: 1, step: 0.005, default: 0.7, tip: 'Previews the bar at this fill. Combined exports use it too; a separate fill layer is exported at 100 %' },
+      { key: 'barLen', label: 'Bar length', type: 'range', min: 0.05, max: 1, step: 0.005, default: 1, tip: 'Length of the bar along the long side, as a share of the texture (minus the margin); the bar stays centered' },
+      { key: 'barThick', label: 'Bar thickness', type: 'range', min: 0.02, max: 1, step: 0.005, default: 1, tip: 'Height of a horizontal bar (width of a vertical one), as a share of the texture (minus the margin); the bar stays centered' },
       { key: 'dir', label: 'Fills from', type: 'select', default: 'start', options: [['start', 'Left / bottom'], ['end', 'Right / top'], ['center', 'Center outward']], tip: 'The bar runs along the long side; use a tall aspect for vertical bars' },
       { key: 'corner', label: 'Corners', type: 'select', default: 'round', options: [['round', 'Rounded'], ['chamfer', 'Chamfered'], ['square', 'Square']] },
       { key: 'radius', label: 'Roundness', type: 'range', min: 0, max: 0.5, step: 0.005, default: 0.2, show: (p) => p.corner !== 'square', tip: 'Fraction of the bar thickness (0.5 = pill)' },

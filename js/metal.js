@@ -24,6 +24,7 @@
     pattern: [0, 1, 'luma', false, 'Pattern as a metal mask: inlays, studs or plates; pick which side is metal with Invert source'],
     flowfield: [0, 1, 'luma', false, 'Flowfield as a metal mask: bright = metal'],
     debris: NON_METAL,
+    carbon: [0, 1, 'metalmask', false, 'Composites (carbon, aramid, glass) are non-metal; the metal patterns (knurl, mesh, hatch, dimples) are 1; dust is non-metal', 1],
     'metal-surface': [0, 1, 'metalmask', false, 'Bare metal (incl. worn edges and scratches through paint) is 1; rust, verdigris, patina, paint and dirt are non-metal (tarnish stays half metallic)', 1],
     moss: [0, 0.2, 'tips', false, 'Moss is non-metal; a touch of metallic on the leaf tips (the curve keeps it on the brightest ones) adds the waxy, shimmering sheen of moss in engines without a sheen slot. Set the range to 0 for strict PBR', 1.6],
   };

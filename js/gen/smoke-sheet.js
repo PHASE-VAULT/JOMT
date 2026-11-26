@@ -15,7 +15,7 @@
     name: 'Smoke',
     desc: 'Looping smoke puff tilesheets from layered, rising and swirling noise with soft lighting or toon shading',
     uses: ['Seamless smoke, steam and dust flipbooks for game particle systems, e.g. chimneys, fires, vents, explosions and footstep dust.', 'Animated smoke sprites for 2D games and stylized toon effects; the white + alpha output can be tinted in the engine.'],
-    tags: ['VFX', 'Nature'],
+    tags: ['VFX', 'Nature', 'Animation'],
     bg: 'checker',
     animLoop: true,
     animate(p, f) { p.time = (p.time || 0) + f.t; return p; },

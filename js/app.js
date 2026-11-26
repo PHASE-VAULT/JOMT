@@ -74,7 +74,8 @@
       view: src ? U.clone(src.view) : { zoom: 'fit', tile: false, bg: gen.bg || 'checker', sections: {} },
       dirty: src ? !!src.dirty : false, // changed since last export
       // name of the applied preset until a setting changes; a fresh tab starts on Default
-      preset: src ? src.preset : gen.presets ? 'Default' : null,
+      preset: src ? src.preset : U.defaultPreset(gen),
+      lastPreset: src ? src.lastPreset || src.preset : U.defaultPreset(gen),
       normal: newNormal(gen, src && src.normal),
       smooth: newSmooth(gen, src && U.clone(src.smooth)),
       metal: newMetal(gen, src && U.clone(src.metal)),
@@ -286,7 +287,7 @@
       let lastKey = '';
       const vals = new Proxy(tab.params, {
         // sh__loop tells the Tilesheet settings that this generator loops (no build-up / fade settings)
-        get: (t, k) => (k === 'sh__loop' ? !!gen.animLoop : typeof k === 'string' && k.startsWith('sh_') ? tab.sheet[k.slice(3)] : t[k]),
+        get: (t, k) => (k === 'sh__loop' ? !!gen.animLoop : k === 'sh__timeline' ? !!gen.animTimeline :typeof k === 'string' && k.startsWith('sh_') ? tab.sheet[k.slice(3)] : t[k]),
         set: (t, k, v) => { lastKey = String(k); if (lastKey.startsWith('sh_')) tab.sheet[lastKey.slice(3)] = v; else t[k] = v; return true; },
       });
       // the key is consumed per change: list item edits write to the item objects (not through the proxy),
@@ -345,6 +346,7 @@
 
   const sheetDesc = (tab) => U.getGen(tab.type).animLoop
     ? U.t('Seamless looping animation, {0} × {0} frames, left to right, top to bottom', tab.sheet.grid)
+    : U.getGen(tab.type).animTimeline ? U.t('One-shot animation from start to end, {0} × {0} frames, left to right, top to bottom', tab.sheet.grid)
     : U.t('Animation of the effect forming and fading, {0} × {0} frames, left to right, top to bottom', tab.sheet.grid);
 
   /* the mode switch above the presets: Texture | Normal map, or Single frame | Tilesheet */
@@ -458,7 +460,7 @@
     const pr = list[U.mod(i, list.length)];
     tab.params = U.presetValues(gen, pr);
     if (pr.aspect) tab.aspect = pr.aspect;
-    tab.preset = pr.name;
+    tab.preset = tab.lastPreset = pr.name;
     markDirty(tab);
     syncChrome();
     buildPanel();
@@ -468,8 +470,9 @@
 
   function stepPreset(dir) {
     const tab = cur(), list = (tab && U.getGen(tab.type).presets) || [];
-    const i = list.findIndex((p) => p.name === tab.preset);
-    // from custom settings, › goes to the first real preset (after Default)
+    // after a setting changed, step on from the last picked preset instead of starting over
+    let i = list.findIndex((p) => p.name === tab.preset);
+    if (i < 0) i = list.findIndex((p) => p.name === tab.lastPreset);
     applyPreset(i < 0 ? (dir > 0 ? 1 : -1) : i + dir);
   }
 
@@ -945,7 +948,7 @@
       }
       if (!t || !confirm(U.t('Reset all settings of this tab to defaults?'))) return;
       t.params = U.defaultsFor(U.getGen(t.type).params);
-      t.preset = U.getGen(t.type).presets ? 'Default' : null;
+      t.preset = t.lastPreset = U.defaultPreset(U.getGen(t.type));
       markDirty(t);
       buildPanel();
       renderPreview(1);
@@ -1457,7 +1460,9 @@
         params: Object.assign(U.defaultsFor(gen.params), t.params),
         view: Object.assign({ zoom: 'fit', tile: false, bg: gen.bg || 'checker', sections: {} }, t.view),
         dirty: !!t.dirty,
-        preset: typeof t.preset === 'string' ? t.preset : null,
+        // sessions from before a generator lost its separate 'Default' entry: that name now means its default preset
+        preset: t.preset === 'Default' && !(gen.presets || []).some((q) => q.name === 'Default') ? U.defaultPreset(gen) : typeof t.preset === 'string' ? t.preset : null,
+        lastPreset: typeof t.lastPreset === 'string' && (gen.presets || []).some((q) => q.name === t.lastPreset) ? t.lastPreset : U.defaultPreset(gen),
         normal: newNormal(gen, t.normal),
         smooth: newSmooth(gen, t.smooth),
         metal: newMetal(gen, t.metal),
